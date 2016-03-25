@@ -628,23 +628,27 @@ int32_t QSaver::initImageDir(const char* img_path, int32_t dir_num)
 
 int32_t QSaver::saveImage(const char* path, const char* data, int32_t len)
 {
-	if(path==NULL || data==NULL || len<=0)
+	if(path==NULL||data==NULL||len<=0)
 		return -1;
+
 	if(access(path, F_OK)!=0)
 	{
 		FILE* fp = fopen(path, "w");
 		if(fp==NULL)
 			return -2;
+
 		if(fwrite(data, len, 1, fp)!=1){
 			fclose(fp);
 			fp=NULL;
 			return -3;
 		}
+
 		fclose(fp);
 		fp=NULL;
-	}else{
+	} else {
 		return 1;
 	}
+
 	return 0;
 }
 
