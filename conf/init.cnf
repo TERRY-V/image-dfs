@@ -1,0 +1,39 @@
+# Configuration File for QImageSaver
+# -------------------------------------------------------------
+
+# 程序服务名称
+SERVER_NAME=图片存储服务
+
+# 服务运行的本机IP
+SERVER_IP=192.168.31.188
+# 服务监听端口号
+SERVER_PORT=8091
+# 监控服务端口号
+MONITOR_PORT=7091
+
+# 客户端Socket超时时间(毫秒)
+SOCK_TIMEOUT=20000
+
+# 通信线程数
+COMM_THREAD_MAX=12
+# 通信线程使用内存大小
+COMM_BUFFER_SIZE=1024
+# 通信线程监控超时时间(毫秒)
+COMM_THREAD_TIMEOUT=10000
+
+# 工作线程数
+WORK_THREAD_MAX=36
+# 工作线程使用内存大小
+WORK_BUFFER_SIZE=3145728
+# 工作线程监控超时时间(毫秒)
+WORK_THREAD_TIMEOUT=18000
+
+# 任务队列最大空间
+TASK_QUEUE_SIZE=200
+
+# 图片保存路径
+IMAGE_SAVE_PATH=/root/platformDC/img/img001/
+
+# 图片保存目数
+IMAGE_DIR_NUMS=100
+
