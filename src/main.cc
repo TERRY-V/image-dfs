@@ -27,7 +27,7 @@ class QSaverService : public QService {
 		virtual int32_t run(int32_t argc, char** argv)
 		{
 			Q_INFO("QSaver init success ,now to start...");
-			qsc.run();
+			qsc.start();
 			Q_INFO("QSaver quit");
 			return 0;
 		}
@@ -46,5 +46,4 @@ int32_t main(int32_t argc, char **argv)
 	QSaverService qss;
 	return qss.main(argc, argv);
 }
-
 

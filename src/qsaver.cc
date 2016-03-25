@@ -1,13 +1,13 @@
 #include "qsaver.h"
 
-struct imageType image_type [] =
+struct imageType image_type[] =
 {
-	{0,(char*)"jpg"},
-	{1,(char*)"png"},
-	{2,(char*)"bmp"},
-	{3,(char*)"gif"},
-	{4,(char*)"tif"},
-	{5,(char*)"jpg"}
+	{0, (char*)"jpg"},
+	{1, (char*)"png"},
+	{2, (char*)"bmp"},
+	{3, (char*)"gif"},
+	{4, (char*)"tif"},
+	{5, (char*)"jpg"}
 };
 
 QSaver::QSaver() :
@@ -35,7 +35,6 @@ QSaver::~QSaver()
 			q_sleep(1000);
 
 		q_delete_array<char>(m_ptr_trd_info[i].ptr_buf);
-
 	}
 
 	q_delete<QLogger>(m_ptr_logger);
@@ -198,19 +197,19 @@ int32_t QSaver::init(const char* cfg_file)
 	ret=initImageDir(m_ptr_cfg_info->image_save_path, m_ptr_cfg_info->image_dir_nums);
 	if(ret<0){
 		m_ptr_logger->log(LEVEL_ERROR, __FILE__, __LINE__, __FUNCTION__, 1, "creat image dir error, ret = (%d)", ret);
-		return -521;
+		return -53;
 	}
 
 	ret=q_init_socket();
 	if(ret<0) {
 		m_ptr_logger->log(LEVEL_ERROR, __FILE__, __LINE__, __FUNCTION__, 1, "init socket error, ret = (%d)", ret);
-		return -53;
+		return -54;
 	}
 
 	ret=q_TCP_server(m_sock_svr, m_ptr_cfg_info->server_port);
 	if(ret<0) {
 		m_ptr_logger->log(LEVEL_ERROR, __FILE__, __LINE__, __FUNCTION__, 1, "TCP server error, ret = (%d)", ret);
-		return -54;
+		return -55;
 	}
 
 	m_thread_max=m_ptr_cfg_info->comm_thread_max+m_ptr_cfg_info->work_thread_max;
@@ -296,18 +295,18 @@ int32_t QSaver::init(const char* cfg_file)
 	return 0;
 }
 
-int32_t QSaver::run()
+int32_t QSaver::start()
 {
-	Q_INFO("input s or S to stop the QSaver!");
+	Q_INFO("Input s or S to stop the qSaver!");
 
 	char ch_;
 	std::cin>>ch_;
 	while(ch_!='s'&&ch_!='S') {
-		Q_INFO("input s or S to stop the QSaver!");
+		Q_INFO("Input s or S to stop the qSaver!");
 		std::cin>>ch_;
 	}
 
-	Q_INFO("QSaver stop!");
+	Q_INFO("qSaver stop!");
 
 	return 0;
 }
@@ -376,12 +375,6 @@ Q_THREAD_T QSaver::work_thread(void* ptr_info)
 	int32_t max_send_size=0;
 	int32_t send_len=0;
 
-	//XML_INFO xml_info;
-
-#if defined (__TIME_USE_TEST__)
-	QStopwatch sw_download;
-#endif
-
 	ptr_trd->run_flag=1;
 
 	TASK_INFO task_info;
@@ -396,10 +389,6 @@ Q_THREAD_T QSaver::work_thread(void* ptr_info)
 		{
 			ptr_trd->status=1;
 			ptr_trd->sw.start();
-
-#if defined (__TIME_USE_TEST__)
-			sw_download.start();
-#endif
 
 			recv_buf=ptr_trd->ptr_buf;
 			max_recv_size=ptr_trd->buf_size;
@@ -461,11 +450,6 @@ Q_THREAD_T QSaver::work_thread(void* ptr_info)
 			}
 
 			q_add_and_fetch(&ptr_this->m_svr_sum);
-
-#if defined (__TIME_USE_TEST__)
-			sw_download.stop();
-			Q_INFO("Work thread process task (%u) consumed: %ds", ptr_this->m_svr_num, sw_download.elapsed_s());
-#endif
 		}
 		ptr_trd->sw.stop();
 	}
@@ -630,10 +614,10 @@ int32_t QSaver::get_thread_state(void* ptr_info)
 
 int32_t QSaver::initImageDir(const char* img_path, int32_t dir_num)
 {
+	char img_dir[1<<10]={0};
 	for(int32_t i=0; i<dir_num; i++)
 	{
-		char img_dir[1<<10] = {0};
-		if(snprintf(img_dir, sizeof(img_dir), "%s%02d", img_path, i) <0)
+		if(snprintf(img_dir, sizeof(img_dir), "%s%02d", img_path, i)<0)
 			throw -90;
 
 		if(!QDir::mkdir(img_dir))
