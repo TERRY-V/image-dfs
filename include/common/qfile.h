@@ -31,15 +31,14 @@ class QFile {
 		virtual ~QFile()
 		{if(fp_!=NULL) fclose(fp_);}
 
-		inline std::string file_name() const
-		{return file_name_;}
-
 		inline void setFileName(const char* file_name)
 		{this->file_name_=file_name;}
 
 		std::string path() const;
 
 		std::string baseName() const;
+
+		std::string file_name() const;
 
 		std::string suffix() const;
 
@@ -54,6 +53,9 @@ class QFile {
 
 		bool copy(const char* file_name);
 		static bool copy(const char* file_name, const char* newName);
+
+		bool hasdir() const;
+		static bool hasdir(const char* file_name);
 
 		// openMode流类型:
 		// r	打开只读文件, 该文件必须存在

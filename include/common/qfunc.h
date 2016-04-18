@@ -190,6 +190,28 @@ static inline char *q_strstr(char* src, int32_t srclen, const char* pat, int32_t
 	return NULL;
 }
 
+static inline bool q_starts_with(const char* src, int32_t srclen, const char* pat, int32_t patlen)
+{
+	if(src==NULL||srclen<=0||pat==NULL||patlen<=0||srclen<patlen)
+		return false;
+
+	if(memcpy((void*)src, (void*)pat, patlen)==0)
+		return true;
+
+	return false;
+}
+
+static inline bool q_ends_with(const char* src, int32_t srclen, const char* pat, int32_t patlen)
+{
+	if(src==NULL||srclen<=0||pat==NULL||patlen<=0||srclen<patlen)
+		return false;
+
+	if(memcpy((void*)(src+srclen-patlen), (void*)pat, patlen)==0)
+		return true;
+
+	return false;
+}
+
 static inline char* q_to_lower(char* psz_buf)
 {
 	if(psz_buf==NULL)
@@ -400,6 +422,41 @@ static inline int32_t q_strrep(char* src, int32_t srclen, char* from, int32_t fr
 	return p2-dest;
 }
 
+static inline int32_t q_strdel(char* src, int32_t srclen, char* str, int32_t len)
+{
+	if(src==NULL||srclen<=0||str==NULL||len<=0)
+		return -1;
+	register int32_t i, j;
+	for(i=0, j=0; i<srclen; ++i, ++j) {
+		if((*(src+i)==*str)&&(memcmp(src+i, str, len)==0))
+			i+=len;
+		if(j!=i)
+			*(src+j)=*(src+i);
+	}
+	*(src+j)='\0';
+	return j;
+}
+
+static inline int32_t q_strdel_cdata(char* src, int32_t srclen)
+{
+	if(src==NULL||srclen<=0)
+		return -1;
+	register int32_t i, j;
+	for(i=0, j=0; i<srclen; ++i, ++j) {
+		if((*(src+i)=='<')&&(memcmp(src+i, "<![CDATA[", 9)==0)) {
+			i+=9;
+		} else if((*(src+i)==']')&&(memcmp(src+i, "]]>", 3)==0)) {
+			i+=3;
+		} else {
+			;
+		}
+		if(j!=i)
+			*(src+j)=*(src+i);
+	}
+	*(src+j)='\0';
+	return j;
+}
+
 static inline int32_t q_split(char* src, int32_t srclen, char* sep, int32_t seplen, int32_t pos[], int32_t pos_size)
 {
 	if(src==NULL||srclen==0||sep==NULL||seplen==0)
@@ -501,26 +558,53 @@ static inline int32_t q_denoise(char* src, int32_t srclen, char* dest, int32_t m
 	while(ptr<ptr_end) {
 		if(*ptr=='<') {
 			// 跳过html标签
-			ptr++;
+			char* ptemp=ptr++;
 			while(ptr<ptr_end&&*ptr!='>')
 				ptr++;
+			int32_t len=ptr-ptemp;
+			if(ptr_out+len>ptr_out_end)
+				return -2;
+
+			if(len==5&&memcmp(ptemp, "</td>", 5)==0) {
+				*ptr_out++=0x20;
+			} else if(len==5&&memcmp(ptemp, "</tr>", 5)==0) {
+				*ptr_out++='\n';
+			} else if((len==4&&memcmp(ptemp, "<br>", 4)==0)||(len==5&&memcmp(ptemp, "<br/>", 5)==0) \
+					||(len==6&&memcmp(ptemp, "<br />", 6)==0)) {
+				*ptr_out++='\n';
+			} else {
+				;
+			}
+
 			if(ptr<ptr_end)
 				ptr++;
-		} else if(*ptr==0x20) {
+#if defined (__KILL_CRLF)
+		} else if(*ptr==0x20||*ptr==0x09||*ptr=='\r'||*ptr=='\n') {
 			// 处理空白字符
 			if(ptr_out+1>ptr_out_end)
 				return -2;
-			*ptr_out++=*ptr++;
-			while(ptr<ptr_end&&*ptr==0x20)
+			*ptr_out++=0x20;
+			ptr++;
+			while(ptr<ptr_end&&(*ptr==0x20||*ptr==0x09||*ptr=='\r'||*ptr=='\n'))
 				ptr++;
-		} else if(*ptr=='\r'||*ptr=='\n') {
-			// 处理换行
+#else
+		} else if(*ptr==0x20||*ptr==0x09) {
+			// 处理空格、TAB键
 			if(ptr_out+1>ptr_out_end)
 				return -3;
+			*ptr_out++=0x20;
+			ptr++;
+			while(ptr<ptr_end&&(*ptr==0x20||*ptr==0x09))
+				ptr++;
+		} else if(*ptr=='\r'||*ptr=='\n') {
+			// 处理回车换行
+			if(ptr_out+1>ptr_out_end)
+				return -4;
 			*ptr_out++='\n';
 			ptr++;
-			while(ptr<ptr_end&&(*ptr=='\r'||*ptr=='\n'||*ptr==0x20))
+			while(ptr<ptr_end&&(*ptr==0x20||*ptr==0x09||*ptr=='\r'||*ptr=='\n'))
 				ptr++;
+#endif
 		} else if(*ptr=='&') {
 			// 处理参照实体
 			char* ptemp=ptr++;
@@ -530,7 +614,7 @@ static inline int32_t q_denoise(char* src, int32_t srclen, char* dest, int32_t m
 				ptr++;
 			int32_t len=ptr-ptemp;
 			if(ptr_out+len>ptr_out_end)
-				return -4;
+				return -5;
 
 			if(len==6&&memcmp(ptemp, "&nbsp;", 6)==0) {
 				*ptr_out++=0x20;
@@ -551,7 +635,7 @@ static inline int32_t q_denoise(char* src, int32_t srclen, char* dest, int32_t m
 		} else {
 			// 处理其它字符
 			if(ptr_out+1>ptr_out_end)
-				return -5;
+				return -6;
 			*ptr_out++=*ptr++;
 		}
 	}
@@ -562,9 +646,11 @@ static inline int32_t q_denoise(char* src, int32_t srclen, char* dest, int32_t m
 	int32_t final_len=0;
 	if(q_trim_skip(dest, ptr_out-dest, beg, end)) {
 		final_len=0;
+		*dest='\0';
 	} else {
 		final_len=end-beg+1;
 		memmove(dest, beg, final_len);
+		*(dest+final_len)='\0';
 	}
 
 	return final_len;
@@ -788,13 +874,81 @@ static inline uint64_t murmurHash64A(const void * key, int len, unsigned int see
 	return h;
 }
 
+// \uBF03 to unicode str
+static inline int32_t q_unicode_hex_decode(char* pszSrc, int32_t iSrcLen, char* pszDest, int32_t iMaxSize)
+{
+	if(pszSrc==NULL||pszDest==NULL||iSrcLen<=0||iMaxSize<=0)
+		return -1;
+
+	char ch(0);
+	int32_t i(0);
+	int32_t j(0);
+	int32_t k(0);
+
+	for(i=0, j=0; (i<iSrcLen)&&(j<iMaxSize); ++i) {
+		ch=pszSrc[i];
+		switch(ch) {
+			case '\\':
+				if((i+5<iSrcLen)&&(pszSrc[i+1]=='u')) {
+					int32_t c=0;
+					for(k=4; k<=5; ++k) {
+						c<<=4;
+						if(pszSrc[i+k]>='0'&&pszSrc[i+k]<='9') {
+							c|=(pszSrc[i+k]-'0');
+						} else if(pszSrc[i+k]>='a'&&pszSrc[i+k]<='f') {
+							c|=(pszSrc[i+k]-'a')+10;
+						} else if(pszSrc[i+k]>='A'&&pszSrc[i+k]<='F') {
+							c|=(pszSrc[i+k]-'A')+10;
+						}
+					}
+					pszDest[j++]=(char)(c&0xff);
+
+					c=0;
+					for(k=2; k<=3; ++k) {
+						c<<=4;
+						if(pszSrc[i+k]>='0'&&pszSrc[i+k]<='9') {
+							c|=(pszSrc[i+k]-'0');
+						} else if(pszSrc[i+k]>='a'&&pszSrc[i+k]<='f') {
+							c|=(pszSrc[i+k]-'a')+10;
+						} else if(pszSrc[i+k]>='A'&&pszSrc[i+k]<='F') {
+							c|=(pszSrc[i+k]-'A')+10;
+						}
+					}
+					pszDest[j++]=(char)(c&0xff);
+
+					i+=5;
+				} else {
+					pszDest[j++]=ch;
+				}
+				break;
+			default:
+				pszDest[j++]=ch;
+				break;
+		}
+	}
+	if(j==iMaxSize)
+		return -1;
+
+	pszDest[j]='\0';
+	return j;
+}
+
+static inline bool q_is_url(const char* pszSrc, int32_t iSrcLen=-1)
+{
+	if(iSrcLen==-1) iSrcLen=strlen(pszSrc);
+	return (iSrcLen>=7&&!strncasecmp(pszSrc, "http://", 7))||(iSrcLen>=8&&!strncasecmp(pszSrc, "https://", 8));
+}
+
 static inline int32_t q_url_decode(char* pszSrc, int32_t iSrcLen, char* pszDest, int32_t iMaxSize)
 {
 	if(pszSrc==NULL||pszDest==NULL||iSrcLen<=0||iMaxSize<=0)
 		return -1;
 
-	char ch;
-	int32_t i, j, k;
+	char ch(0);
+	int32_t i(0);
+	int32_t j(0);
+	int32_t k(0);
+
 	for(i=0, j=0; (i<iSrcLen)&&(j<iMaxSize); ++i) {
 		ch=pszSrc[i];
 		switch(ch) {
@@ -861,6 +1015,39 @@ static inline int32_t q_url_encode(char* pszSrc, int32_t iSrcLen, char* pszDest,
 
 	pszDest[j]='\0';
 	return j;
+}
+
+static inline bool q_is_palindrome(const char* s, int32_t n)
+{
+	if(s==NULL||n<=0)
+		return false;
+
+	const char* front=s;
+	const char* back=s+n-1;
+	while(front<back) {
+		if(*front!=*back)
+			return false;
+		++front;
+		--back;
+	}
+
+	return true;
+}
+
+static inline void q_full_permutation(char* perm, int32_t from, int32_t to)
+{
+	if(from==to) {
+		for(int32_t i=0; i<=to; ++i)
+			printf("%c", perm[i]);
+		printf("\n");
+	} else {
+		for(int32_t j=from; j<=to; ++j)
+		{
+			q_swap(perm[j], perm[from]);
+			q_full_permutation(perm, from+1, to);
+			q_swap(perm[j], perm[from]);
+		}
+	}
 }
 
 static inline std::string q_id_to_62string(uint64_t value)
@@ -1157,6 +1344,28 @@ static inline std::vector<std::string> q_split(const std::string& ss, char sep)
 	return elems;
 }
 
+static inline void q_split(const std::string& ss, char sep, std::vector<std::string>& elems)
+{
+	size_t start=0;
+	size_t end;
+	while((end=ss.find(sep, start))!=ss.npos) {
+		elems.push_back(ss.substr(start, end-start));
+		start=end+1;
+	}
+	elems.push_back(ss.substr(start));
+}
+
+static inline void q_split(const std::string& ss, char sep, std::list<std::string>& elems)
+{
+	size_t start=0;
+	size_t end;
+	while((end=ss.find(sep, start))!=ss.npos) {
+		elems.push_back(ss.substr(start, end-start));
+		start=end+1;
+	}
+	elems.push_back(ss.substr(start));
+}
+
 static inline std::vector<std::string> q_split(const std::string& ss, const std::string& sep)
 {
 	std::vector<std::string> elems;
@@ -1172,6 +1381,32 @@ static inline std::vector<std::string> q_split(const std::string& ss, const std:
 	return elems;
 }
 
+static inline void q_split(const std::string& ss, const std::string& sep, std::vector<std::string>& elems)
+{
+	size_t start=0;
+	size_t extra=0;
+	size_t end;
+	while((end=ss.find(sep, start+extra))!=ss.npos) {
+		elems.push_back(ss.substr(start, end-start));
+		start=end+sep.length();
+		extra=(sep.length()==0?1:0);
+	}
+	elems.push_back(ss.substr(start));
+}
+
+static inline void q_split(const std::string& ss, const std::string& sep, std::list<std::string>& elems)
+{
+	size_t start=0;
+	size_t extra=0;
+	size_t end;
+	while((end=ss.find(sep, start+extra))!=ss.npos) {
+		elems.push_back(ss.substr(start, end-start));
+		start=end+sep.length();
+		extra=(sep.length()==0?1:0);
+	}
+	elems.push_back(ss.substr(start));
+}
+
 static inline std::vector<std::string> q_split_any(const std::string& ss, const std::string& sep)
 {
 	std::vector<std::string> elems;
@@ -1185,6 +1420,32 @@ static inline std::vector<std::string> q_split_any(const std::string& ss, const 
 	}
 	elems.push_back(ss.substr(start));
 	return elems;
+}
+
+static inline void q_split_any(const std::string& ss, const std::string& sep, std::vector<std::string>& elems)
+{
+	size_t start=0;
+	size_t extra=0;
+	size_t end;
+	while((end=ss.find_first_of(sep, start+extra))!=ss.npos) {
+		elems.push_back(ss.substr(start, end-start));
+		start=end+(sep.length()==0?0:1);
+		extra=(sep.length()==0?1:0);
+	}
+	elems.push_back(ss.substr(start));
+}
+
+static inline void q_split_any(const std::string& ss, const std::string& sep, std::list<std::string>& elems)
+{
+	size_t start=0;
+	size_t extra=0;
+	size_t end;
+	while((end=ss.find_first_of(sep, start+extra))!=ss.npos) {
+		elems.push_back(ss.substr(start, end-start));
+		start=end+(sep.length()==0?0:1);
+		extra=(sep.length()==0?1:0);
+	}
+	elems.push_back(ss.substr(start));
 }
 
 static inline std::string q_substr(const std::string& ss, const std::string& s1, const std::string& s2)
@@ -1265,6 +1526,32 @@ static inline std::vector<std::string> q_line_tokenize(const std::string& ss)
 		if(sent.length()) sents.push_back(q_trim(sent));
 	}
 	return sents;
+}
+
+static inline std::string q_repair_url(const std::string& url, const std::string& host)
+{
+	std::string s("");
+	std::string ss("");
+
+	s=q_replace(url, "\\/", "/");
+
+	if(q_starts_with(s, "http://")||q_starts_with(s, "https://")||q_starts_with(s, "ftp://")) {
+		ss.append(s);
+	} else if(q_starts_with(s, "//")) {
+		ss.append("http:");
+		ss.append(s);
+	} else if(q_starts_with(s, "://")) {
+		ss.append("http");
+		ss.append(s);
+	} else if(q_starts_with(s, '/')) {
+		ss.append(host);
+		ss.append(s);
+	} else {
+		ss.append(host);
+		ss.append("/");
+		ss.append(s);
+	}
+	return ss;
 }
 
 Q_END_NAMESPACE

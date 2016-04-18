@@ -1,39 +1,101 @@
-# Configuration File for QImageSaver
-# -------------------------------------------------------------
+# ImageDFS configuration file
 
-# 程序服务名称
-SERVER_NAME=图片存储服务
+# By default ImageDFS does not run as a daemon. Use 'yes' if you need it. Note that Kalava 
+# will write a pid file in /var/run/kalava-face detection.pid when daemonized.
+daemonize = no
 
-# 服务运行的本机IP
-SERVER_IP=192.168.31.188
-# 服务监听端口号
-SERVER_PORT=8091
-# 监控服务端口号
-MONITOR_PORT=7091
+# When running daemonized, ImageDFS writes a pid file in /var/run/idfs.pid by default. 
+# You can specify a custom pid file location here.
+pidfile = /var/run/idfs.pid
 
-# 客户端Socket超时时间(毫秒)
-SOCK_TIMEOUT=20000
+# TCP listen() backlog.
+# In high requests-per-second environments you need an high backlog in order
+# to avoid slow clients connections issues. Note that the Linux kernel
+# will silently truncate it to the value of /proc/sys/net/core/somaxconn so
+# make sure to raise both the value of somaxconn and tcp_max_syn_backlog
+# in order to get the desired effect.
+tcp-backlog = 511
 
-# 通信线程数
-COMM_THREAD_MAX=12
-# 通信线程使用内存大小
-COMM_BUFFER_SIZE=1024
-# 通信线程监控超时时间(毫秒)
-COMM_THREAD_TIMEOUT=10000
+# Service name
+server-name = ImageDFS
 
-# 工作线程数
-WORK_THREAD_MAX=36
-# 工作线程使用内存大小
-WORK_BUFFER_SIZE=3145728
-# 工作线程监控超时时间(毫秒)
-WORK_THREAD_TIMEOUT=18000
+# Port for processing
+server-port = 8090
 
-# 任务队列最大空间
-TASK_QUEUE_SIZE=200
+# Port for monitoring
+monitor-port = 8012
 
-# 图片保存路径
-IMAGE_SAVE_PATH=/root/platformDC/img/img001/
+# Timeout for socket
+# Specify the socket timeouts until reporting an error.
+server-timeout = 12000
 
-# 图片保存目数
-IMAGE_DIR_NUMS=100
+# ImageDFS threads, thread cache size and timeout value.
+comm-thread-max = 1
+
+comm-buffer-size = 1024
+
+comm-thread-timeout = 8000
+
+work-thread-max = 8
+
+work-buffer-size = 1048576
+
+work-thread-timeout = 12000
+
+send-thread-max = 0
+
+send-buffer-size = 10240
+
+send-thread-timeout = 8000
+
+# Task queue size
+queue-size = 200
+
+# Max clients
+# Max number of simultaneous clients, clients more than max-clients will be blocked.
+max-clients = 100
+
+# Sending server ip address
+send-ip = 192.168.1.100
+
+# Sending server port
+send-port = 22222
+
+# Image storage path
+# Path for storing images.
+img-path = /root/platformDC/img/pic001
+
+img-directory-num = 1000
+
+# Data storage path
+# Path for storing proccessed binary data.
+data-path = ./data/
+
+read-path = ./data/read.snd
+
+write-path = ./data/write.snd
+
+# MongoDB configuration
+mongo-uri = mongodb://127.0.0.1:27017
+
+mongo-img-collection = idfs.imginfo
+
+# Kalava log path
+# When the service starts, the startup log will be written under the log path. If
+# the path does not exist, the service will create the path by default.
+log-path = ../log/
+
+# Kalava log prefix
+# The log file may need a prefix for telling differences between threads or processes.
+# If this parameter is used, a prefix will be added before the log file name.
+log-prefix = idfs
+
+# Kalava log screen
+# By default the server shows logging messages on screen, anyway, it could be disabled
+# by setting log-screen value "no".
+log-screen = yes
+
+# Kalava log message size
+# Under most circumstances, 1024 bytes is enough for log message.
+log-size = 10240
 

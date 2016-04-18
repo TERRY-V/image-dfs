@@ -45,41 +45,62 @@ Q_BEGIN_NAMESPACE
 class QNetworkAccessManager {
 	public:
 		QNetworkAccessManager();
+
 		virtual ~QNetworkAccessManager();
 
+		/* init */
 		int32_t init();
 
 		/* referer */
-		bool setReferer(const char* referer);
+		bool setReferer(const char* referer=NULL);
 
 		/* user-agent */
 		bool setUserAgent(const char* user_agent=NULL);
 
 		/* proxy */
 		bool setProxy(const char* proxy);
+
 		bool setProxy(const char* ip, int16_t port);
 
 		/* cookie */
 		bool setCookie(const char* cookie);
+
 		bool setCookieEnabled();
 
 		/* redirection */
 		bool setRedirectionEnabled(int64_t times=NET_DEFAULT_REDIRECTIONS);
 
+		/* source interface for outgoing traffic */
+		bool setInterface(const char* interface);
+
 		/* reset */
 		void resetOption();
 
-		/* HTTP Request */
-		int32_t doHttpHeader(const char* pUrl, char* pPage, int32_t iMaxPageSize, int32_t iTimeOut=NET_DEFAULT_TIMEOUT);
-		int32_t doHttpPost(const char* pUrl, const char* pData, char* pPage, int32_t iMaxPageSize, int32_t iTimeOut=NET_DEFAULT_TIMEOUT);
-		int32_t doHttpGet(const char* pUrl, char* pPage, int32_t iMaxPageSize, int32_t iTimeOut=NET_DEFAULT_TIMEOUT);
+		/* Header method */
+		int32_t doHttpHeader(const char* pUrl, int32_t iTimeout, char* pPage, int32_t iMaxPageSize);
+
+		/* Get method */
+		int32_t doHttpGet(const char* pUrl, int32_t iTimeOut, char* pPage, int32_t iMaxPageSize);
+
+		/* Post method */
+		int32_t doHttpPost(const char* pUrl, const char* pData, int32_t iTimeOut, char* pPage, int32_t iMaxPageSize);
+
+		/* Download */
 		int32_t doHttpDownload(const char* pUrl, const char* pFileName, int32_t iTimeOut=NET_DEFAULT_TIMEOUT);
+
+		/* Encoding */
+		int32_t contentCodec();
 
 	private:
 		static size_t processFunc(void* ptr, size_t size, size_t nmemb, void* userdata);
+
 		static size_t processDownloadFunc(void* ptr, size_t size, size_t nmemb, void* userdata);
 
+		inline int32_t codecFromContentType(const char* content_type);
+
 	protected:
+		Q_DISABLE_COPY(QNetworkAccessManager);
+
 		QNetworkAccessManager* network_manager_;
 		CURL*		curl_handle_;
 		char*		ptr_page_;

@@ -334,6 +334,7 @@ class QTextCodec: public noncopyable
 				} else {
 					Q_DEBUG("QTextCodec::convert: unknown error");
 				}
+				::iconv_close(conv);
 				return -3;
 			}
 
@@ -342,7 +343,6 @@ class QTextCodec: public noncopyable
 
 			return outSize-outBytesLeft;
 		}
-
 #endif
 };
 

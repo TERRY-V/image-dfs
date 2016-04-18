@@ -2,6 +2,12 @@
 
 Q_BEGIN_NAMESPACE
 
+std::string QFile::file_name() const
+{
+	int32_t pos=(file_name_.find_last_of('/')!=file_name_.npos)?(file_name_.find_last_of('/')+1):0;
+	return file_name_.substr(pos, file_name_.length());
+}
+
 std::string QFile::path() const
 {
 	int32_t pos=(file_name_.find_last_of('/')!=file_name_.npos)?(file_name_.find_last_of('/')+1):0;
@@ -38,13 +44,9 @@ bool QFile::exists(const char* file_name)
 
 bool QFile::remove()
 {
-	int32_t count=0;
 	while(exists()&&::remove(file_name_.c_str())!=0) {
+		Q_DEBUG("QFile::remove (%s) failed, errno = (%d)", file_name_.c_str(), errno);
 		q_sleep(1000);
-		if(count++>=10000) {
-			Q_DEBUG("QFile::remove (%s) failed, errno = (%d)", file_name_.c_str(), errno);
-			count=0;
-		}
 	}
 	return true;
 }
@@ -62,13 +64,9 @@ bool QFile::rename(const char* file_name)
 	}
 
 	QFile::remove(file_name);
-	int32_t count=0;
 	while(exists()&&!exists(file_name)&&::rename(file_name_.c_str(), file_name)!=0) {
+		Q_DEBUG("QFile::rename (%s) failed, errno = (%d)", file_name_.c_str(), errno);
 		q_sleep(1000);
-		if(count++>=10000) {
-			Q_DEBUG("QFile::rename (%s) failed, errno = (%d)", file_name_.c_str(), errno);
-			count=0;
-		}
 	}
 	return true;
 }
@@ -123,6 +121,23 @@ bool QFile::copy(const char* file_name)
 bool QFile::copy(const char* file_name, const char* newName)
 {
 	return QFile(file_name).copy(newName);
+}
+
+bool QFile::hasdir() const
+{
+#ifdef WIN32
+	return true;
+#else
+	if(q_starts_with(file_name_, "/")||q_starts_with(file_name_, "./") \
+			||q_starts_with(file_name_, "../"))
+		return true;
+	return false;
+#endif
+}
+
+bool QFile::hasdir(const char* file_name)
+{
+	return QFile(file_name).hasdir();
 }
 
 // openMode流类型:

@@ -13,329 +13,363 @@
 #define __QTCPSOCKET_H_
 
 #include "qglobal.h"
+#include "qalgorithm.h"
+#include "qconfigreader.h"
+#include "qdatetime.h"
+#include "qdir.h"
+#include "qfile.h"
+#include "qfunc.h"
+#include "qlogger.h"
+#include "qmd5.h"
+#include "qqueue.h"
+#include "qremotemonitor.h"
+#include "qservice.h"
+#include "qvector.h"
+#include "cJSON.h"
 
 Q_BEGIN_NAMESPACE
 
+#define TCP_OK                    (0)
+#define TCP_ERR                   (-1)
+
+#define TCP_ERR_HEAP_ALLOC        (-2)
+
+#define TCP_ERR_SOCKET_INIT	  (-11)
+#define TCP_ERR_SOCKET_CONNECTION (-12)
+
+#define TCP_ERR_SOCKET_ACCEPT     (-13)
+#define TCP_ERR_SOCKET_TIMEOUT    (-14)
+#define TCP_ERR_SOCKET_RECV       (-15)
+#define TCP_ERR_PACKET_HEADER     (-16)
+#define TCP_ERR_PACKET_LENGTH     (-17)
+#define TCP_ERR_SOCKET_SEND       (-18)
+
+#define TCP_ERR_SOCKET_VERSION    (-19)
+#define TCP_ERR_PROTOCOL_TYPE     (-20)
+#define TCP_ERR_SOURCE_TYPE       (-21)
+#define TCP_ERR_COMMAND_TYPE      (-22)
+#define TCP_ERR_BUFFER_SIZE       (-23)
+#define TCP_ERR_OPERATE_TYPE      (-24)
+#define TCP_ERR_DATA_LENGTH       (-25)
+
+#define TCP_DEFAULT_HZ            (10)
+#define TCP_DEFAULT_MIN_HZ        (1)
+#define TCP_DEFAULT_MAX_HZ        (500)
+
+#define TCP_DEFAULT_PIDFILE       ("/var/run/niu.pid")
+#define TCP_DEFAULT_CONFIG_FILE   ("../conf/init.conf")
+
+#define TCP_DEFAULT_SERVER_IP     ("127.0.0.1")
+#define TCP_DEFAULT_SERVER_PORT	  (8088)
+#define TCP_DEFAULT_MONITOR_PORT  (8078)
+#define TCP_DEFAULT_SERVER_TIMEOUT (10000)
+
+#define TCP_DEFAULT_PROTOCOL_TYPE (1)
+#define TCP_DEFAULT_SOURCE_TYPE   (1)
+#define TCP_DEFAULT_COMMAND_TYPE  (1)
+#define TCP_DEFAULT_OPERATE_TYPE  (1)
+
+#define TCP_DEFAULT_INVALID_SOCKET (-1)
+#define TCP_DEFAULT_THREAD_NUM    (1)
+#define TCP_DEFAULT_BUFFER_SIZE   (1<<20)
+#define TCP_DEFAULT_THREAD_TIMEOUT (12000)
+
+#define TCP_DEFAULT_QUEUE_SIZE    (200)
+#define TCP_DEFAULT_REQUEST_SIZE  (1<<20)
+#define TCP_DEFAULT_REPLY_SIZE    (1<<20)
+#define TCP_DEFAULT_HEADER_SIZE   (12)
+
+#define TCP_DEFAULT_IP_SIZE       (16)
+#define TCP_DEFAULT_NAME_SIZE     (1<<8)
+#define TCP_DEFAULT_PATH_SIZE     (1<<8)
+
+#define TCP_DEFAULT_LOG_PATH      ("../log/")
+#define TCP_DEFAULT_LOG_PREFIX	  (NULL)
+#define TCP_DEFAULT_LOG_SIZE      (1<<10)
+#define TCP_DEFAULT_LOG_SCREEN    (1)
+
+#define TCP_HEADER_VERSION	  (*(uint64_t*)"YST1.0.0")
+#define TCP_TAILER_FILE_MARK	  (*(uint64_t*)"@#@#@#@#")
+
+#pragma pack(1)
+
+/* thread info */
+struct threadInfo {
+	void		*pthis;
+	uint32_t	id;
+	int8_t		status;
+	int8_t		flag;
+	int32_t		buf_size;
+	char*		ptr_buf;
+	int32_t		timeout;
+	QStopwatch	sw;
+
+	void*		for_worker;
+
+	threadInfo() :
+		pthis(NULL),
+		id(0),
+		status(0),
+		flag(0),
+		buf_size(0),
+		ptr_buf(NULL),
+		timeout(TCP_DEFAULT_THREAD_TIMEOUT),
+		for_worker(NULL)
+	{}
+};
+
+/* protocol */
+struct baseHeader {
+	uint64_t	version;
+	int32_t		length;
+};
+
+/* request param */
+struct requestParam {
+	uint16_t	protocol_type;
+	uint16_t	source_type;
+	char		reserved[14];
+	uint16_t	command_type;
+};
+
+/* reply param */
+struct replyParam {
+	char		reserved[14];
+	uint16_t	command_type;
+	int32_t		status;
+};
+
+/* request header */
+struct requestHeader {
+	uint64_t	version;
+	int32_t		length;
+	uint16_t	protocol_type;
+	uint16_t	source_type;
+	char		reserved[14];
+	uint16_t	command_type;
+};
+
+/* reply header */
+struct replyHeader {
+	uint64_t	version;
+	int32_t		length;
+	char		reserved[14];
+	uint16_t	command_type;
+	int32_t		status;
+};
+
+/* network reply */
+struct networkReply {
+	int32_t         status;
+	char*           data;
+	int32_t         length;
+
+	networkReply() :
+		status(0),
+		data(NULL),
+		length(0)
+	{}
+};
+
+/* client info */
+struct clientInfo {
+	Q_SOCKET_T      client_sock;
+	char            client_ip[TCP_DEFAULT_IP_SIZE];
+	int32_t         client_port;
+
+	char*           request_buffer;
+	int32_t         request_buffer_size;
+	char*           reply_buffer;
+	int32_t         reply_buffer_size;
+
+	clientInfo() :
+		client_sock(TCP_DEFAULT_INVALID_SOCKET),
+		request_buffer(NULL),
+		request_buffer_size(0),
+		reply_buffer(NULL),
+		reply_buffer_size(0)
+	{}
+};
+
+#pragma pack()
+
 // TCP通讯客户端
-class QTcpClient {
+class QTcpClient : public noncopyable {
 	public:
-		// @函数名: 初始化函数
-		// @参数01: 服务端IP
-		// @参数02: 服务端port
-		// @参数03: socket超时时间
-		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t init(const char* server_ip, const uint16_t server_port, const int32_t time_out)
-		{
-			strcpy(m_server_ip, server_ip);
-			m_server_port=server_port;
-			m_time_out=time_out;
+		// @函数名: 构造函数
+		explicit QTcpClient();
 
-			if(q_init_socket()) {
-				Q_DEBUG("QTcpClient: socket init error!");
-				return -1;
-			}
-			return 0;
-		}
+		// @函数名: 析构函数
+		virtual ~QTcpClient();
 
-		// @函数名: 连接socket服务端
-		// @参数01: socket句柄
-		// @参数02: 服务端IP地址
-		// @参数03: 服务端port
-		// @参数04: socket超时时间
-		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t connect(void*& handle, char* server_ip=NULL, uint16_t server_port=0, int32_t time_out=-1)
-		{
-			Q_SOCKET_T* socket=q_new<Q_SOCKET_T>();
-			if(socket==NULL)
-				return -1;
+		// @函数名: 设置主机名
+		void setHost(const char* server_ip, uint16_t server_port);
 
-			if(server_ip)
-				strcpy(m_server_ip, server_ip);
-			if(server_port)
-				m_server_port=server_port;
-			if(time_out>=0)
-				m_time_out=time_out;
+		// @函数名: 设置主机名
+		void setHost(const char* host);
 
-			if(q_connect_socket(*socket, m_server_ip, m_server_port)) {
-				Q_DEBUG("QTcpClient: connect %s:%d error!", m_server_ip, m_server_port);
-				return -2;
-			}
-			if(q_set_overtime(*socket, m_time_out)) {
-				Q_DEBUG("QTcpClient: set overtime %d error!", m_time_out);
-				return -3;
-			}
+		// @函数名: 设置超时时间
+		void setTimeout(int32_t timeout=TCP_DEFAULT_SERVER_TIMEOUT);
 
-			handle=(void*)socket;
-			return 0;
-		}
+		// @函数名: 设置协议版本信息
+		void setVersion(uint64_t version=TCP_HEADER_VERSION);
 
-		// @函数名: 数据发送函数
-		// @参数01: socket连接句柄
-		// @参数02: 待发送数据
-		// @参数03: 待发送数据长度
-		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t send(void* handle, char* send_buf, int32_t send_len)
-		{
-			if(q_sendbuf(*(Q_SOCKET_T*)handle, send_buf, send_len))
-				return -1;
-			return 0;
-		}
+		// @函数名: 设置协议类型
+		void setProtocolType(uint16_t protocol_type);
 
-		// @函数名: 数据接收函数
-		// @参数01: socket连接句柄
-		// @参数02: 待接收数据
-		// @参数03: 待接收数据长度
-		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t recv(void* handle, char* recv_buf, int32_t recv_len)
-		{
-			if(q_recvbuf(*(Q_SOCKET_T*)handle, recv_buf, recv_len))
-				return -1;
-			return 0;
-		}
+		// @函数名: 设置来源类型
+		void setSourceType(uint16_t source_type);
 
-		// @函数名: 关闭客户端连接
-		// @参数01: socket连接句柄
-		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t close(void* handle)
-		{
-			Q_SOCKET_T* socket=reinterpret_cast<Q_SOCKET_T*>(handle);
-			q_close_socket(*socket);
-			q_delete<Q_SOCKET_T>(socket);
-			return 0;
-		}
+		// @函数名: 设置命令类型
+		void setCommandType(uint16_t command_type);
+
+		// @函数名: 设置操作类型
+		void setOperateType(uint16_t operate_type);
+
+		// @函数名: 发送请求信息
+		int32_t sendRequest(const char* ptr_data, int32_t data_len, const void* ptr_extend=NULL, int32_t extend_len=0);
+
+		// @函数名: 获取响应信息
+		int32_t getReply(networkReply* reply);
 
 	protected:
-		char m_server_ip[16];
-		uint16_t m_server_port;
-		int32_t m_time_out;
+		/* General */
+		char            server_ip_[16];
+		uint16_t        server_port_;
+		int32_t         server_timeout_;
+		/* networking */
+		Q_SOCKET_T      sock_;
+		uint64_t	version_;
+		uint16_t	protocol_type_;
+		uint16_t	source_type_;
+		uint16_t	command_type_;
+		/* io buffer */
+		uint16_t	operate_type_;
+		char*           request_buffer_;
+		int32_t         request_buffer_size_;
+		char*           reply_buffer_;
+		int32_t         reply_buffer_size_;
 };
 
 // TCP通讯服务端
-class QTcpServer {
+class QTcpServer : public noncopyable {
 	public:
-		// @函数名: 初始化TCP通讯服务端
-		// @参数01: 监听端口
-		// @参数02: 最大监听连接数
-		// @参数03: 超时时间
-		// @参数04: 通讯模式 1->单次收发 0->多次收发
-		// @参数05: socket数据包head大小
-		// @参数06: 最大发送数据包大小
-		// @参数07: 通用接收数据包大小
-		// @参数08: 最大接收数据包大小
-		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t init(uint16_t listen_port, int32_t listen_num, int32_t time_out, int32_t model_type=0, int32_t head_size=0, int32_t max_send_size=0, \
-				int32_t min_recv_size=1<<10, int32_t max_recv_size=1<<10)
-		{
-			m_listen_port=listen_port;
-			m_listen_num=listen_num;
-			m_time_out=time_out;
-			m_head_size=head_size;
-			m_max_send_size=max_send_size;
-			m_model_type=model_type;
-			m_min_recv_size=min_recv_size;
-			m_max_recv_size=max_recv_size;
+		// @函数名: 构造函数
+		explicit QTcpServer();
 
-			if(q_init_socket()) {
-				Q_DEBUG("QTcpServer: socket init error!");
-				return -1;
-			}
+		// @函数名: 析构函数
+		virtual ~QTcpServer();
 
-			if(q_TCP_server(m_listen, m_listen_port)) {
-				Q_DEBUG("QTcpServer: socket listen (%d) error!", m_listen_port);
-				return -2;
-			}
-			return 0;
-		}
+		// @函数名: 初始化函数
+		virtual int32_t init(const char* cfg_file);
 
-		// @函数名: 启动服务
-		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t start()
-		{
-			for(int32_t i=0; i<m_listen_num; ++i) {
-				m_success_flag=0;
-				if(q_create_thread(ts_daemon_thread, this))
-					return -1;
-				while(m_success_flag==0)
-					q_sleep(1);
-				if(m_success_flag<0)
-					return -1;
-			}
-			return 0;
-		}
+		// @函数名: 主线程启动函数
+		virtual int32_t start();
 
-		// @函数名: 数据发送函数
-		// @参数01: socket连接句柄
-		// @参数02: 待发送数据
-		// @参数03: 待发送数据长度
-		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t send(void* handle, char* send_buf, int32_t send_len)
-		{
-			if(q_sendbuf(*(Q_SOCKET_T*)handle, send_buf, send_len))
-				return -1;
-			return 0;
-		}
+		// @函数名: 继承类必须实现的业务逻辑初始化函数
+		virtual int32_t server_init(void*& handle)=0;
 
-		// @函数名: 数据接收函数
-		// @参数01: socket连接句柄
-		// @参数02: 待接收数据
-		// @参数03: 待接收数据长度
-		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t recv(void* handle, char* recv_buf, int32_t recv_len)
-		{
-			if(q_recvbuf(*(Q_SOCKET_T*)handle, recv_buf, recv_len))
-				return -1;
-			return 0;
-		}
+		// @函数名: 继承类必须实现的消息头解析函数
+		virtual int32_t server_header(const char* header_buffer, int32_t header_len, const void* handle=NULL)=0;
 
-		// @函数名: 关闭客户端连接
-		// @参数01: socket连接句柄
-		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t close(void* handle)
-		{
-			q_close_socket(*(Q_SOCKET_T*)handle);
-			return 0;
-		}
+		// @函数名: 继承类必须实现的消息体解析函数
+		virtual int32_t server_process(const char* request_buffer, int32_t request_len, char* reply_buffer, int32_t reply_size, \
+				const void* handle=NULL)=0;
 
-		// @函数名: 继承类必须实现的包头解析函数
-		virtual int32_t ts_fun_package(const char* in_buf, int32_t in_buf_size, const void* handle=NULL)=0;
+		// @函数名: 继承类必须实现的业务逻辑类释放函数
+		virtual int32_t server_free(const void* handle=NULL)=0;
 
-		// @函数名: 继承类必须实现的协议处理函数
-		virtual int32_t ts_fun_process(const char* in_buf, int32_t in_buf_size, const char* out_buf, int32_t out_buf_size, const void* handle=NULL)=0;
+		// @函数名: 继承类必须实现的初始化函数
+		virtual int32_t initialize()=0;
+
+		// @函数名: 继承类必须实现的释放函数
+		virtual int32_t release()=0;
 
 	private:
-		static Q_THREAD_T ts_daemon_thread(void* argv)
-		{
-			QTcpServer* ts=static_cast<QTcpServer*>(argv);
+		// @函数名: 配置读取函数
+		int32_t load_server_config(const char* cfg_file);
 
-			char* recv_buf=NULL;
-			int32_t recv_len=0;
-			char* send_buf=NULL;
-			int32_t send_len=0;
-			char* temp_buf=NULL;
+		// @函数名: 通信线程
+		static Q_THREAD_T comm_thread(void* ptr_info);
 
-			if(ts->m_model_type==1) {
-				recv_buf=new(std::nothrow) char[ts->m_min_recv_size];
-				if(recv_buf==NULL) {
-					ts->m_success_flag=-1;
-					return NULL;
-				}
-				if(ts->m_max_send_size>0) {
-					send_buf=new(std::nothrow) char[ts->m_max_send_size];
-					if(send_buf==NULL) {
-						ts->m_success_flag=-1;
-						return NULL;
-					}
-				}
-			}
+		// @函数名: 工作线程
+		static Q_THREAD_T work_thread(void* ptr_info);
 
-			ts->m_success_flag=1;
+		// @函数名: 发送线程
+		static Q_THREAD_T send_thread(void* ptr_info);
 
-			Q_FOREVER {
-				Q_SOCKET_T socket;
-				char client_ip[32];
-				int32_t client_port;
+		// @函数名: 数据存储函数
+		int32_t write_data_file(const char* ptr_file, FILE*& fp_w, const char* ptr_buf, int32_t buf_len);
 
-				if(q_accept_socket(ts->m_listen, socket, client_ip, client_port)) {
-					q_sleep(1);
-					continue;
-				}
+		// @函数名: 数据备份函数
+		int32_t backup_file(const char* ptr_file, char* ptr_buf, int32_t buf_size);
 
-				if(q_set_overtime(socket, ts->m_time_out)) {
-					q_close_socket(socket);
-					Q_DEBUG("QTcpServer: set time out (%d) error!", ts->m_time_out);
-					continue;
-				}
+		// @函数名: 释放服务器信息
+		void free_server_info();
 
-				if(ts->m_model_type==1) {
-					if(temp_buf) {
-						if(recv_buf) delete recv_buf;
-						recv_buf=temp_buf;
-						temp_buf=NULL;
-					}
-
-					if(q_recvbuf(socket, recv_buf, ts->m_head_size)) {
-						q_close_socket(socket);
-						Q_DEBUG("QTcpServer: recv head error, size = (%d)", ts->m_head_size);
-						continue;
-					}
-
-					recv_len=ts->ts_fun_package(recv_buf, ts->m_head_size);
-					if(recv_len<0) {
-						q_close_socket(socket);
-						Q_DEBUG("QTcpServer: ts_fun_package error, code = (%d)", recv_len);
-						continue;
-					}
-
-					if(recv_len>0) {
-						if(recv_len>ts->m_min_recv_size) {
-							if(recv_len>ts->m_max_recv_size) {
-								q_close_socket(socket);
-								Q_DEBUG("QTcpServer: recv length(%d) > max recv length(%d)", recv_len, ts->m_max_recv_size);
-								continue;
-							}
-
-							temp_buf=recv_buf;
-							recv_buf=new(std::nothrow) char[recv_len];
-							if(recv_buf==NULL) {
-								q_close_socket(socket);
-								Q_DEBUG("QTcpServer: alloc recv memory error, size = (%d)", recv_len);
-								continue;
-							}
-						}
-
-						if(q_recvbuf(socket, recv_buf, recv_len)) {
-							q_close_socket(socket);
-							Q_DEBUG("QTcpServer: recv body error, size = (%d)", recv_len);
-							continue;
-						}
-					}
-
-					send_len=ts->ts_fun_process(recv_buf, recv_len, send_buf, ts->m_max_send_size);
-					if(send_len<0) {
-						q_close_socket(socket);
-						Q_DEBUG("QTcpServer: ts_fun_process error, code = (%d)", send_len);
-						continue;
-					}
-					if(send_len>0) {
-						if(q_sendbuf(socket, send_buf, send_len)) {
-							q_close_socket(socket);
-							Q_DEBUG("QTcpServer: send buffer error, size = (%d)", send_len);
-							continue;
-						}
-					}
-				} else {
-					ts->ts_fun_process(recv_buf, recv_len, send_buf, send_len, (void*)&socket);
-				}
-				
-				q_close_socket(socket);
-			}
-
-			return 0;
-		}
+		// @函数名: 获取线程运行状态
+		static int32_t get_thread_state(void* ptr_info);
 
 	protected:
-		// 服务端监听端口号
-		uint16_t m_listen_port;
-		// 监听线程数
-		int32_t m_listen_num;
-		// 连接超时时间(毫秒)
-		int32_t m_time_out;
-		// 通讯模式 1->单次收发 0->多次收发
-		int32_t m_model_type;
-		// 协议头长度
-		int32_t m_head_size;
-		// 最大发送长度
-		int32_t m_max_send_size;
-		// 通用接收长度
-		int32_t m_min_recv_size;
-		// 最大接收长度
-		int32_t m_max_recv_size;
-
-		// 监听描述符
-		Q_SOCKET_T m_listen;
-
-		// 状态标识符
-		int32_t m_success_flag;
+		/* general */
+		uint32_t        pid_;
+		char*           pidfile_;
+		char*           configfile_;
+		time_t          unixtime_;
+		uint32_t        hz_;
+		uint32_t        arch_bits_;
+		bool            start_flag_;
+		bool            exit_flag_;
+		/* configuration */
+		QConfigReader*  config_;
+		char*           server_name_;
+		uint16_t        server_port_;
+		int32_t         server_timeout_;
+		/* threads */
+		threadInfo*     thread_info_;
+		int32_t         thread_max_;
+		int32_t	        comm_thread_max_;
+		int32_t         comm_buffer_size_;
+		int32_t         comm_thread_timeout_;
+		int32_t         work_thread_max_;
+		int32_t         work_buffer_size_;
+		int32_t         work_thread_timeout_;
+		int32_t	        send_thread_max_;
+		int32_t         send_buffer_size_;
+		int32_t         send_thread_timeout_;
+		/* networking */
+		Q_SOCKET_T      listen_sock_;
+		int32_t         queue_size_;
+		int32_t         client_request_size_;
+		int32_t         client_reply_size_;
+		int32_t         header_size_;
+		QQueue<clientInfo*>* chunk_queue_;
+		QQueue<clientInfo*>* client_queue_;
+		QTrigger*       client_trigger_;
+		/* storage */
+		char*           send_ip_;
+		int32_t         send_port_;
+		char*           data_path_;
+		char*           read_path_;
+		char*           write_path_;
+		FILE*           write_fp_;
+		QMutexLock      file_mutex_;
+		/* sentinel */
+		QRemoteMonitor* monitor_;
+		uint16_t        monitor_port_;
+		/* log */
+		QLogger*        logger_;
+		char*           log_path_;
+		char*           log_prefix_;
+		int32_t         log_size_;
+		int32_t         log_screen_;
+		/* fields used only for stats */
+		time_t          stat_starttime_;
+		time_t          stat_lastinteraction_;
+		uint32_t        stat_numconnections_;
+		uint32_t        stat_succconnections_;
+		uint32_t        stat_failedconnections_;
+		uint32_t        stat_rejectedconnections_;
 };
 
 Q_END_NAMESPACE

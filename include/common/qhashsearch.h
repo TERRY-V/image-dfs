@@ -41,10 +41,10 @@ class QHashSearch {
 				q_delete_array<char*>(hash_table_);
 
 			if(allocator_FL_!=NULL)
-				q_delete<QAllocatorRecycle>(allocator_FL_);
+				q_delete<QPoolAllocator>(allocator_FL_);
 
 			if(allocator_VL_!=NULL)
-				q_delete< QAllocator<char> >(allocator_VL_);
+				q_delete< QAllocator >(allocator_VL_);
 		}
 
 		// @函数名: 哈希表初始化函数
@@ -63,11 +63,11 @@ class QHashSearch {
 			memset(hash_table_, 0, bucket_size_*sizeof(void*));
 
 			if(data_len_<0) {
-				allocator_VL_=q_new< QAllocator<char> >();
+				allocator_VL_=q_new<QAllocator>();
 				if(allocator_VL_==NULL)
 					return -2;
 			} else {
-				allocator_FL_=q_new< QAllocatorRecycle >();
+				allocator_FL_=q_new< QPoolAllocator >();
 				if(allocator_FL_==NULL)
 					return -3;
 				if(allocator_FL_->init(sizeof(void*)+sizeof(Key)+data_len_))
@@ -529,8 +529,8 @@ err:
 		int32_t			bucket_size_;		// 哈希表桶的大小
 		char**			hash_table_;		// 内存哈希表
 
-		QAllocatorRecycle*	allocator_FL_;		// 定长数据内存池
-		QAllocator<char>*	allocator_VL_;		// 变长数据内存池
+		QPoolAllocator*		allocator_FL_;		// 定长数据内存池
+		QAllocator*		allocator_VL_;		// 变长数据内存池
 
 		int32_t			traversal_index_;	// 哈希表遍历桶索引
 		char*			traversal_pos_;		// 哈希表遍历链表位置

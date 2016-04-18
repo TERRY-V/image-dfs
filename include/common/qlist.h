@@ -233,7 +233,7 @@ class QForwardList {
 		}
 
 	protected:
-		QAllocatorRecycle allocator_;
+		QPoolAllocator allocator_;
 		NodeInfo* head_;
 		QMutexLock mutex_;
 		int32_t size_;

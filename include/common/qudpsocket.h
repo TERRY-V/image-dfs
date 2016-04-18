@@ -228,7 +228,7 @@ class QUdpServer {
 					continue;
 				}
 
-				Q_DEBUG("Thread [%lu] recive from [%s:%d] message: %s", q_thread_id(), inet_ntoa(c_addr.sin_addr), ntohs(c_addr.sin_port), buffer);
+				Q_DEBUG("Thread [%llu] recive from [%s:%d] message: %s", q_thread_id(), inet_ntoa(c_addr.sin_addr), ntohs(c_addr.sin_port), buffer);
 
 				send_len=::sendto(us->m_listen, buffer, recv_len, 0, (struct sockaddr*)&c_addr, addr_len);
 				if(send_len<0||send_len!=recv_len) {

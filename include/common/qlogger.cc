@@ -166,6 +166,7 @@ int32_t QLogger::init(const char* logPath, const char* logPrefix, uint32_t messa
 			strcpy(logPath_, ".");
 		} else if(logPath[len-1]=='/') {
 			strncpy(logPath_, logPath, len-1);
+			logPath_[len-1]='\0';
 		} else {
 			strcpy(logPath_, logPath);
 		}
@@ -182,7 +183,7 @@ int32_t QLogger::init(const char* logPath, const char* logPrefix, uint32_t messa
 			if(logPrefix[len-1]=='_') {
 				strcpy(logPrefix_, logPrefix);
 			} else {
-				q_snprintf(logPrefix_, sizeof(logPrefix), "%s_", logPrefix);
+				q_snprintf(logPrefix_, sizeof(logPrefix_), "%s_", logPrefix);
 			}
 		}
 	}

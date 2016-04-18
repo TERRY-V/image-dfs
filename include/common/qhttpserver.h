@@ -700,7 +700,7 @@ class QHttpServer: public noncopyable {
 				for(int32_t i=0; i<nfds; ++i) {
 					sockfd=ptr_this->m_epoll_events[i].data.fd;
 
-					if((ptr_this->m_epoll_events[i].events&EPOLLERR)||(ptr_this->m_epoll_events[i].events&EPOLLHUP)||(!ptr_this->m_epoll_events[i].events&EPOLLIN)) {
+					if((ptr_this->m_epoll_events[i].events&EPOLLERR)||(ptr_this->m_epoll_events[i].events&EPOLLHUP)||(!(ptr_this->m_epoll_events[i].events&EPOLLIN))) {
 						// An error has occured on this fd, or the socket is not ready for reading (why were we notified then?)
 						Q_DEBUG("QHttpServer: epoll error, sockfd = (%d)!", sockfd);
 						q_close_socket(sockfd);

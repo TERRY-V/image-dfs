@@ -36,7 +36,10 @@ int32_t QNetworkAccessManager::init()
 
 bool QNetworkAccessManager::setReferer(const char* referer)
 {
-	return (CURLE_OK==::curl_easy_setopt(curl_handle_, CURLOPT_REFERER, referer));
+	if(referer==NULL)
+		return (CURLE_OK==::curl_easy_setopt(curl_handle_, CURLOPT_AUTOREFERER, 1L));
+	else
+		return (CURLE_OK==::curl_easy_setopt(curl_handle_, CURLOPT_REFERER, referer));
 }
 
 bool QNetworkAccessManager::setUserAgent(const char* user_agent)
@@ -80,8 +83,13 @@ bool QNetworkAccessManager::setCookieEnabled()
 
 bool QNetworkAccessManager::setRedirectionEnabled(int64_t times)
 {
-	// -1L表示无限次重定向
-	return (CURLE_OK==::curl_easy_setopt(curl_handle_, CURLOPT_MAXREDIRS, times));
+	return (CURLE_OK==::curl_easy_setopt(curl_handle_, CURLOPT_FOLLOWLOCATION, 1L) \
+			&&CURLE_OK==::curl_easy_setopt(curl_handle_, CURLOPT_MAXREDIRS, times));
+}
+
+bool QNetworkAccessManager::setInterface(const char* interface)
+{
+	return (CURLE_OK==::curl_easy_setopt(curl_handle_, CURLOPT_INTERFACE, interface));
 }
 
 void QNetworkAccessManager::resetOption()
@@ -92,7 +100,7 @@ void QNetworkAccessManager::resetOption()
 	page_len_=0;
 }
 
-int32_t QNetworkAccessManager::doHttpHeader(const char* pUrl, char* pPage, int32_t iMaxPageSize, int32_t iTimeOut)
+int32_t QNetworkAccessManager::doHttpHeader(const char* pUrl, int32_t iTimeOut, char* pPage, int32_t iMaxPageSize)
 {
 	if(pUrl==NULL||pPage==NULL||iMaxPageSize<=0||iTimeOut<=0)
 		return NET_ERR;
@@ -100,6 +108,7 @@ int32_t QNetworkAccessManager::doHttpHeader(const char* pUrl, char* pPage, int32
 	ptr_page_=pPage;
 	max_page_size_=iMaxPageSize;
 	page_len_=0;
+
 	timeout_=iTimeOut;
 
 	CURLcode res;
@@ -160,14 +169,15 @@ int32_t QNetworkAccessManager::doHttpHeader(const char* pUrl, char* pPage, int32
 	return page_len_;
 }
 
-int32_t QNetworkAccessManager::doHttpPost(const char* pUrl, const char* pData, char* pPage, int32_t iMaxPageSize, int32_t iTimeOut)
+int32_t QNetworkAccessManager::doHttpPost(const char* pUrl, const char* pData, int32_t iTimeOut, char* pPage, int32_t iMaxPageSize)
 {
-	if(pUrl==NULL||pData==NULL||pPage==NULL||iMaxPageSize<=0||iTimeOut<=0)
+	if(pUrl==NULL||pData==NULL||iTimeOut<=0||pPage==NULL||iMaxPageSize<=0)
 		return NET_ERR;
 
 	ptr_page_=pPage;
 	max_page_size_=iMaxPageSize;
 	page_len_=0;
+
 	timeout_=iTimeOut;
 
 	CURLcode res;
@@ -230,14 +240,15 @@ int32_t QNetworkAccessManager::doHttpPost(const char* pUrl, const char* pData, c
 	return page_len_;
 }
 
-int32_t QNetworkAccessManager::doHttpGet(const char* pUrl, char* pPage, int32_t iMaxPageSize, int32_t iTimeOut)
+int32_t QNetworkAccessManager::doHttpGet(const char* pUrl, int32_t iTimeOut, char* pPage, int32_t iMaxPageSize)
 {
-	if(pUrl==NULL||pPage==NULL||iMaxPageSize<=0||iTimeOut<=0)
+	if(pUrl==NULL||iTimeOut<=0||pPage==NULL||iMaxPageSize<=0)
 		return NET_ERR;
 
 	ptr_page_=pPage;
 	max_page_size_=iMaxPageSize;
 	page_len_=0;
+
 	timeout_=iTimeOut;
 
 	CURLcode res;
@@ -360,6 +371,18 @@ int32_t QNetworkAccessManager::doHttpDownload(const char* pUrl, const char* pFil
 	return NET_OK;
 }
 
+int32_t QNetworkAccessManager::contentCodec()
+{
+	char* content_type=NULL;
+	int32_t codec=0;
+
+	CURLcode res=::curl_easy_getinfo(curl_handle_, CURLINFO_CONTENT_TYPE, &content_type);
+	if(CURLE_OK==res&&content_type)
+		codec=codecFromContentType(content_type);
+
+	return codec;
+}
+
 size_t QNetworkAccessManager::processFunc(void* ptr, size_t size, size_t nmemb, void* userdata)
 {
 	QNetworkAccessManager *ptr_this=static_cast<QNetworkAccessManager*>(userdata);
@@ -398,6 +421,25 @@ size_t QNetworkAccessManager::processDownloadFunc(void* ptr, size_t size, size_t
 #endif
 	fflush(pFile);
 	return iSize;
+}
+
+int32_t QNetworkAccessManager::codecFromContentType(const char* content_type)
+{
+	int32_t codec=0;
+	char* ptr=strcasestr((char*)content_type, (char*)"charset=");
+	if(ptr==NULL)
+		return codec;
+
+	ptr+=8;
+	if(strcasecmp(ptr, "gbk")==0||strcasecmp(ptr, "gb2312")==0) {
+		codec=1;
+	} else if(strcasecmp(ptr, "utf-8")==0) {
+		codec=2;
+	} else {
+		codec=0;
+	}
+
+	return codec;
 }
 
 Q_END_NAMESPACE

@@ -31,61 +31,62 @@ class QStrIDAllocator {
 		// @参数01: 允许的最多标签个数
 		// @参数02: 数据文件路径
 		// @返回值: 成功返回0, 失败返回<0的错误码
-		int32_t init(uint32_t max_str_num, const char* save_file)
+		int32_t init(uint32_t string_max, const char* rdb_file)
 		{
-			if(max_str_num==0||save_file==NULL)
+			if(string_max==0||rdb_file==NULL)
 				return -1;
 
-			m_max_str_num=max_str_num;
-			strcpy(m_save_file, save_file);
+			string_max_=string_max;
+			strcpy(rdb_file_, rdb_file);
 
-			m_i2s_map=new(std::nothrow) char*[m_max_str_num];
-			if(m_i2s_map==NULL)
+			is_map_=q_new_array<char*>(string_max_);
+			if(is_map_==NULL)
 				return -2;
-			memset(m_i2s_map, 0, m_max_str_num*sizeof(void*));
+			memset(is_map_, 0, string_max_*sizeof(char*));
 
-			int32_t hash_size=(m_max_str_num/2)+1;
-			if(m_s2i_map.init(hash_size, sizeof(void*)))
+			int32_t bucket_size=(string_max_/2)+1;
+			if(si_map_.init(bucket_size, sizeof(void*)))
 				return -3;
 
-			m_file_len=0;
-			m_cur_str_num=0;
+			rdb_length_=0;
+			string_now_=0;
 
-			if(access(m_save_file, 0)) {
-				m_save_fp=fopen(m_save_file, "wb+");
-				if(m_save_fp==NULL)
+			if(access(rdb_file_, 0)) {
+				rdb_fp_=fopen(rdb_file_, "wb+");
+				if(rdb_fp_==NULL)
 					return -4;
 				return 0;
 			}
 
-			m_save_fp=fopen(m_save_file, "rb+");
-			if(m_save_fp==NULL)
+			rdb_fp_=fopen(rdb_file_, "rb+");
+			if(rdb_fp_==NULL)
 				return -5;
 
 			char read_buf[16];
-			Q_FOREVER {
-				if(fread(read_buf, sizeof(read_buf), 1, m_save_fp)!=1)
+			while(1) {
+				if(fread(read_buf, sizeof(read_buf), 1, rdb_fp_)!=1)
 					break;
 
 				int32_t size=16+*(int32_t*)(read_buf+12)+8;
-				char* ptr=m_alloc.alloc(size);
+				char* ptr=allocator_.alloc(size);
 				if(ptr==NULL)
 					return -6;
+
 				memcpy(ptr, read_buf, 16);
 
-				if(fread(ptr+16, *(int32_t*)(ptr+12)+8, 1, m_save_fp)!=1)
+				if(fread(ptr+16, *(int32_t*)(ptr+12)+8, 1, rdb_fp_)!=1)
 					return -7;
 
-				assert(m_cur_str_num==*(uint32_t*)ptr);
+				assert(string_now_==*(uint32_t*)ptr);
 
-				if(m_s2i_map.addKey_FL(*(uint64_t*)(ptr+4), &ptr)<0)
+				if(si_map_.addKey_FL(*(uint64_t*)(ptr+4), &ptr)<0)
 					return -8;
 
-				m_i2s_map[m_cur_str_num++]=ptr;
-				m_file_len+=size;
+				is_map_[string_now_++]=ptr;
+				rdb_length_+=size;
 			}
 
-			assert(m_file_len==ftell(m_save_fp));
+			assert(rdb_length_==ftell(rdb_fp_));
 
 			return 0;
 		}
@@ -100,55 +101,55 @@ class QStrIDAllocator {
 			if(str==NULL||str_len==0)
 				return -1;
 
-			uint64_t md5=m_md5.MD5Bits64((unsigned char*)str, str_len);
+			uint64_t md5=md5_.MD5Bits64((unsigned char*)str, str_len);
 
-			m_locker.lock();
+			mutex_.lock();
 
 			void* val=NULL;
-			if(m_s2i_map.searchKey_FL(md5, &val)==0) {
+			if(si_map_.searchKey_FL(md5, &val)==0) {
 				id=**(uint32_t**)val;
-				m_locker.unlock();
+				mutex_.unlock();
 				return 1;
 			}
 
-			if(m_cur_str_num>=m_max_str_num) {
-				m_locker.unlock();
+			if(string_now_>=string_max_) {
+				mutex_.unlock();
 				return -2;
 			}
 
 			uint32_t size=4+8+4+str_len+8;	// id, md5, len, str, flg
 
-			char* buf=m_alloc.alloc(size);
+			char* buf=allocator_.alloc(size);
 			if(buf==NULL) {
-				m_locker.unlock();
+				mutex_.unlock();
 				return -3;
 			}
 
-			*(uint32_t*)buf=m_cur_str_num;
+			*(uint32_t*)buf=string_now_;
 			*(uint64_t*)(buf+4)=md5;
 			*(uint32_t*)(buf+12)=str_len;
 			memcpy(buf+16, str, str_len);
 			*(uint64_t*)(buf+size-8)=*(uint64_t*)"!@#$$#@!";
 
-			if(fwrite(buf, size, 1, m_save_fp)!=1) {
-				m_locker.unlock();
+			if(fwrite(buf, size, 1, rdb_fp_)!=1) {
+				mutex_.unlock();
 				return -4;
 			}
 
-			if(fflush(m_save_fp)) {
-				m_locker.unlock();
+			if(fflush(rdb_fp_)) {
+				mutex_.unlock();
 				return -5;
 			}
 
-			if(m_s2i_map.addKey_FL(md5, (void*)&buf)) {
-				m_locker.unlock();
+			if(si_map_.addKey_FL(md5, (void*)&buf)) {
+				mutex_.unlock();
 				return -6;
 			}
 
-			m_file_len+=size;
-			m_i2s_map[m_cur_str_num]=buf;
-			id=m_cur_str_num++;
-			m_locker.unlock();
+			rdb_length_+=size;
+			is_map_[string_now_]=buf;
+			id=string_now_++;
+			mutex_.unlock();
 
 			return 0;
 		}
@@ -161,10 +162,10 @@ class QStrIDAllocator {
 		// @返回值: 成功返回0, 失败返回<0的错误码
 		int32_t id2str(uint32_t id, const char*& str, uint32_t& str_len, uint64_t& md5)
 		{
-			if(id>=m_cur_str_num)
+			if(id>=string_now_)
 				return -1;
 			
-			char* buf=m_i2s_map[id];
+			char* buf=is_map_[id];
 			if(buf==NULL)
 				return -2;
 
@@ -178,21 +179,20 @@ class QStrIDAllocator {
 		}
 
 	private:
-		uint32_t m_max_str_num;
-		uint32_t m_cur_str_num;
+		uint32_t	string_max_;
+		uint32_t	string_now_;
 
-		char m_save_file[256];
-		FILE* m_save_fp;
+		char		rdb_file_[256];
+		FILE*		rdb_fp_;
+		int64_t		rdb_length_;
 
-		int64_t m_file_len;
+		char**		is_map_;
+		QHashSearch<uint64_t> si_map_;
 
-		char** m_i2s_map;
-		QHashSearch<uint64_t> m_s2i_map;
+		QAllocator	allocator_;
 
-		QAllocator<char> m_alloc;
-
-		QMutexLock m_locker;
-		QMD5 m_md5;
+		QMutexLock	mutex_;
+		QMD5		md5_;
 };
 
 Q_END_NAMESPACE

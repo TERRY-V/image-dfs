@@ -121,12 +121,12 @@ class QLatency {
 
 			fprintf(fp, "Sorted result:\n");
 			for(int32_t i=0; i<samples; ++i)
-				fprintf(fp, "EventID %lu: %ums\n", eventid_array[i], latency_array[i]);
+				fprintf(fp, "EventID %llu: %ums\n", eventid_array[i], latency_array[i]);
 			fprintf(fp, "\n");
 
-			fprintf(fp, "Peak event id:        %lu\n", eventid_array[samples-1]);
+			fprintf(fp, "Peak event id:        %llu\n", eventid_array[samples-1]);
 			fprintf(fp, "Peak event latency:   %ums\n", latency_array[samples-1]);
-			fprintf(fp, "Valley event id:      %lu\n", eventid_array[0]);
+			fprintf(fp, "Valley event id:      %llu\n", eventid_array[0]);
 			fprintf(fp, "Valley event latency: %ums\n", latency_array[0]);
 			fprintf(fp, "\n");
 

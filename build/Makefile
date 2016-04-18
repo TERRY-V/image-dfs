@@ -45,18 +45,23 @@ endif
 
 INCS		:= -I../include/common
 INCS		+= -I../src
+INCS            += -I/usr/local/include/mongo-client-install/include/
 
 #****************************************************************************
 # Include libs
 #****************************************************************************
 
 LIBS		:= `pkg-config --libs --cflags opencv`
+LIBS            += -I/usr/local/include/mongo-client-install/include/
+LIBS            += /usr/local/include/mongo-client-install/lib/libmongoclient.a
+LIBS            += -lpthread
+LIBS            += -lboost_system -lboost_thread -lboost_regex -lboost_date_time
 
 #****************************************************************************
 # Targets of the build
 #****************************************************************************
 
-OUTPUT		:= ../bin/qSaver
+OUTPUT		:= ../bin/idfs-server
 
 all: ${OUTPUT}
 
@@ -67,8 +72,11 @@ all: ${OUTPUT}
 SRCS		:= qdir.cc
 SRCS		+= qfile.cc
 SRCS		+= qlogger.cc
+SRCS		+= qmongoclient.cc
+SRCS		+= qremotemonitor.cc
+SRCS		+= qtcpsocket.cc
 SRCS		+= qservice.cc
-SRCS		+= qsaver.cc
+SRCS		+= idfsserver.cc
 SRCS		+= main.cc
 
 OBJS		:= $(addsuffix .o, $(basename ${SRCS}))

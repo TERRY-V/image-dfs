@@ -41,7 +41,6 @@ static int getImageSize(const char* fileName, int* width, int* height)
 	*width = size.width;
 	*height = size.height;
 
-	cv::waitKey(0);
 	return 0;
 }
 
@@ -59,7 +58,6 @@ static int getSubImage(const char* fileName, const char* newFileName, int x, int
 	img(rect).copyTo(dstImage);
 	cv::imwrite(newFileName, dstImage);
 
-	cv::waitKey(0);
 	return 0;
 }
 
@@ -77,7 +75,6 @@ static int erode(const char* fileName, const char* newFileName)
 	cv::erode(img, dstImage, element);
 	cv::imwrite(newFileName, dstImage);
 
-	cv::waitKey(0);
 	return 0;
 }
 
@@ -94,7 +91,6 @@ static int blur(const char* fileName, const char* newFileName)
 	cv::blur(img, dstImage, cv::Size(7, 7));
 	cv::imwrite(newFileName, dstImage);
 
-	cv::waitKey(0);
 	return 0;
 }
 
@@ -115,7 +111,6 @@ static int canny(const char* fileName, const char* newFileName)
 	cv::Canny(edge, edge, 3, 9, 3);
 	cv::imwrite(newFileName, edge);
 
-	cv::waitKey(0);
 	return 0;
 }
 
@@ -132,7 +127,6 @@ static int resize(const char* fileName, const char* newFileName, float ratio = 0
 	cv::resize(img, dstImage, cv::Size(img.cols*ratio, img.rows*ratio), (0, 0), (0, 0), 3);
 	cv::imwrite(newFileName, dstImage);
 
-	cv::waitKey(0);
 	return 0;
 }
 
@@ -154,7 +148,6 @@ static int getSurfFeature(const char* fileName, const char* newFileName)
 	drawKeypoints(img, keypoints, dstImage, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT);
 	cv::imwrite(newFileName, dstImage);
 
-	cv::waitKey(0);
 	return 0;
 }
 
@@ -210,7 +203,7 @@ static int process_flann(const char* fileName1, const char* fileName2, const cha
 			std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
 
 	cv::imwrite(newFileName, img_matches);
-	cv::waitKey(0);
+	return 0;
 }
 
 Q_END_NAMESPACE

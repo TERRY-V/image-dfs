@@ -4,21 +4,21 @@
 #include <algorithm>
 #include <cassert>
 
-#include "qsaver.h"
+#include "idfsserver.h"
 
-class QSaverService : public QService {
+class IDFSService : public QService {
 	public:
-		QSaverService()
+		IDFSService()
 		{}
 
-		virtual ~QSaverService()
+		virtual ~IDFSService()
 		{}
 
 		virtual int32_t init()
 		{
-			int32_t ret=qsc.init("../conf/init.cnf");
+			int32_t ret=server.init("../conf/init.cnf");
 			if(ret<0){
-				Q_INFO("QSaver init failed, ret = (%d)", ret);
+				Q_INFO("IDFSserver init failed, ret = (%d)", ret);
 				return -1;
 			}
 			return 0;
@@ -26,9 +26,9 @@ class QSaverService : public QService {
 
 		virtual int32_t run(int32_t argc, char** argv)
 		{
-			Q_INFO("QSaver init success ,now to start...");
-			qsc.start();
-			Q_INFO("QSaver quit");
+			Q_INFO("IDFSserver init success ,now to start...");
+			server.start();
+			Q_INFO("IDFSserver quit");
 			return 0;
 		}
 
@@ -38,12 +38,12 @@ class QSaverService : public QService {
 		}
 	
 	private:
-		QSaver qsc;
+		IDFSServer server;
 };
 
 int32_t main(int32_t argc, char **argv)
 {
-	QSaverService qss;
-	return qss.main(argc, argv);
+	IDFSService idfs;
+	return idfs.main(argc, argv);
 }
 

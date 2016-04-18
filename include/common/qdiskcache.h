@@ -46,10 +46,10 @@ class QDiskCache {
 				q_delete_array<char*>(hash_table_);
 
 			if(allocator_FL_!=NULL)
-				q_delete<QAllocatorRecycle>(allocator_FL_);
+				q_delete<QPoolAllocator>(allocator_FL_);
 
 			if(allocator_VL_!=NULL)
-				q_delete< QAllocator<char> >(allocator_VL_);
+				q_delete<QAllocator>(allocator_VL_);
 		}
 
 		// @函数名: 缓存类初始化函数
@@ -70,11 +70,11 @@ class QDiskCache {
 			memset(hash_table_, 0, bucket_size_*sizeof(void*));
 
 			if(data_len_<0) {
-				allocator_VL_=q_new< QAllocator<char> >();
+				allocator_VL_=q_new< QAllocator >();
 				if(allocator_VL_==NULL)
 					return -2;
 			} else {
-				allocator_FL_=q_new< QAllocatorRecycle >();
+				allocator_FL_=q_new< QPoolAllocator >();
 				if(allocator_FL_==NULL)
 					return -3;
 				if(allocator_FL_->init(sizeof(void*)+sizeof(Key)+data_len_))
@@ -453,8 +453,8 @@ class QDiskCache {
 			Q_CHECK_PTR(ptr_this);
 
 			FILE* fp=NULL;
-			int32_t beginFlag=0xEEEEEEEE;
-			int32_t endFlag=0xFFFFFFFF;
+			uint32_t beginFlag=0xEEEEEEEE;
+			uint32_t endFlag=0xFFFFFFFF;
 
 			ptr_this->success_flag_=1;
 
@@ -540,7 +540,7 @@ err:
 			void* vpRetBuf=NULL;
 			int32_t lRetLen=0;
 
-			int32_t iFlag=0;
+			uint32_t iFlag=0;
 			int32_t bucket_size=0;
 			int32_t data_num=0;
 			int32_t data_len=0;
@@ -597,8 +597,8 @@ err:
 		int32_t			bucket_size_;		// 缓存类桶的大小
 		char**			hash_table_;		// 内存缓存类
 
-		QAllocatorRecycle*	allocator_FL_;		// 定长数据内存池
-		QAllocator<char>*	allocator_VL_;		// 变长数据内存池
+		QPoolAllocator*		allocator_FL_;		// 定长数据内存池
+		QAllocator*		allocator_VL_;		// 变长数据内存池
 
 		int32_t			traversal_index_;	// 缓存类遍历桶索引
 		char*			traversal_pos_;		// 缓存类遍历链表位置
