@@ -2,5 +2,7 @@
 
 ### third party library
 
-##### none
+##### MongoDB cxx driver
+##### Opencv
+##### Boost
 
