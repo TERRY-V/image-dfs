@@ -12,11 +12,12 @@
 #ifndef __QMONGOCLIENT_H_
 #define __QMONGOCLIENT_H_
 
+#include "mongo/client/dbclient.h"
+#include "boost/date_time/posix_time/posix_time.hpp"
+
 #include "qglobal.h"
 #include "qdatetime.h"
 #include "qfunc.h"
-#include "mongo/client/dbclient.h"
-#include "boost/date_time/posix_time/posix_time.hpp"
 
 #define MONGO_OK  (0)
 #define MONGO_ERR (-1)

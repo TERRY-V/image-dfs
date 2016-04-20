@@ -63,9 +63,11 @@ send-port = 22222
 
 # Image storage path
 # Path for storing images.
-img-path = /root/platformDC/img/pic001
+img-path = /root/platformDC/img
 
-img-directory-num = 1000
+img-dir = pic001
+
+img-subdir-num = 1000
 
 # Data storage path
 # Path for storing proccessed binary data.

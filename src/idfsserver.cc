@@ -8,7 +8,11 @@ int32_t IDFSServer::initialize()
 	if(ret<0)
 		return TCP_ERR;
 
-	ret=config_->getFieldInt32("img-directory-num", img_directory_num_);
+	ret=config_->getFieldString("img-dir", img_dir_);
+	if(ret<0)
+		return TCP_ERR;
+
+	ret=config_->getFieldInt32("img-subdir-num", img_subdir_num_);
 	if(ret<0)
 		return TCP_ERR;
 
@@ -29,9 +33,9 @@ int32_t IDFSServer::initialize()
 	}
 
 	char directory[1<<10]={0};
-	for(int32_t i=0; i<img_directory_num_; i++)
+	for(int32_t i=0; i<img_subdir_num_; i++)
 	{
-		if(snprintf(directory, sizeof(directory), "%s/%03d", img_path_, i)<0)
+		if(snprintf(directory, sizeof(directory), "%s/%s/%03d", img_path_, img_dir_, i)<0)
 			return TCP_ERR;
 
 		if(!QDir::mkdir(directory))
@@ -176,6 +180,7 @@ int32_t IDFSServer::server_main(uint16_t type, const char* ptr_data, int32_t dat
 
 	std::string imgid("");
 	std::string local_path("");
+	std::string file_path("");
 	std::string img_size("");
 
 	int32_t width=0;
@@ -209,7 +214,8 @@ int32_t IDFSServer::server_main(uint16_t type, const char* ptr_data, int32_t dat
 				return -54;
 			}
 		} else {
-			local_path=q_format("%s/%03d/%lx.%s", img_path_, static_cast<int32_t>(iid%1000), iid, get_image_type_name(type));
+			file_path=q_format("%s/%03d/%lx.%s", img_dir_, static_cast<int32_t>(iid%1000), iid, get_image_type_name(type));
+			local_path=img_path_+'/'+file_path;
 
 			ret=save_image(local_path.c_str(), ptr_data, data_len);
 			if(ret<0) {
@@ -238,7 +244,7 @@ int32_t IDFSServer::server_main(uint16_t type, const char* ptr_data, int32_t dat
 			return -58;
 		ptr_temp+=ret;
 
-		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgpath><![CDATA[%s]]></imgpath>\n", local_path.c_str());
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgpath><![CDATA[%s]]></imgpath>\n", file_path.c_str());
 		if(ptr_temp+ret>=ptr_end)
 			return -59;
 		ptr_temp+=ret;

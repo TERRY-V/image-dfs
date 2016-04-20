@@ -59,7 +59,8 @@ class IDFSServer : public QTcpServer {
 	private:
 		/* img directory */
 		char*           img_path_;
-		int32_t         img_directory_num_;
+		char*           img_dir_;
+		int32_t         img_subdir_num_;
 		/* mongo */
 		QMongoClient*   mongo_client_;
 		char*           mongo_uri_;
