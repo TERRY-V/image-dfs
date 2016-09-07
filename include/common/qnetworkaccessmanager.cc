@@ -14,23 +14,31 @@ QNetworkAccessManager::QNetworkAccessManager() :
 QNetworkAccessManager::~QNetworkAccessManager()
 {
 	::curl_easy_cleanup(curl_handle_);
+}
+
+int32_t QNetworkAccessManager::global_init()
+{
+	::curl_global_init(CURL_GLOBAL_ALL);
+	return NET_OK;
+}
+
+int32_t QNetworkAccessManager::global_cleanup()
+{
 	::curl_global_cleanup();
+	return NET_OK;
 }
 
 int32_t QNetworkAccessManager::init()
 {
-	CURLcode res=::curl_global_init(CURL_GLOBAL_ALL);
-	if(res!=CURLE_OK) {
-		Q_INFO("QNetworkAccessManager: curl_global_init failed, res = (%d)", res);
-		return NET_ERR;
-	}
-
 	curl_handle_=::curl_easy_init();
 	if(NULL==curl_handle_) {
 		Q_INFO("QNetworkAccessManager:: curl_easy_init failed!");
 		return NET_ERR;
 	}
 
+	ptr_page_=0;
+	max_page_size_=0;
+	page_len_=0;
 	return NET_OK;
 }
 
@@ -140,6 +148,14 @@ int32_t QNetworkAccessManager::doHttpHeader(const char* pUrl, int32_t iTimeOut, 
 	if(CURLE_OK!=res)
 		return NET_ERR_SET_WRITEDATA;
 
+	res=curl_easy_setopt(curl_handle_, CURLOPT_SSL_VERIFYPEER, 0L);
+	if(CURLE_OK!=res)
+		return NET_ERR_SSL_VERIFYPEER;
+
+	res=curl_easy_setopt(curl_handle_, CURLOPT_SSL_VERIFYHOST, 0L);
+	if(CURLE_OK!=res)
+		return NET_ERR_SSL_VERIFYHOST;
+
 	res=::curl_easy_setopt(curl_handle_, CURLOPT_NOSIGNAL, 1L);
 	if(CURLE_OK!=res)
 		return NET_ERR_SET_NOSIGNAL;
@@ -204,6 +220,14 @@ int32_t QNetworkAccessManager::doHttpPost(const char* pUrl, const char* pData, i
 	res=::curl_easy_setopt(curl_handle_, CURLOPT_WRITEDATA, network_manager_);
 	if(CURLE_OK!=res)
 		return NET_ERR_SET_WRITEDATA;
+
+	res=curl_easy_setopt(curl_handle_, CURLOPT_SSL_VERIFYPEER, 0L);
+	if(CURLE_OK!=res)
+		return NET_ERR_SSL_VERIFYPEER;
+
+	res=curl_easy_setopt(curl_handle_, CURLOPT_SSL_VERIFYHOST, 0L);
+	if(CURLE_OK!=res)
+		return NET_ERR_SSL_VERIFYHOST;
 
 	res=::curl_easy_setopt(curl_handle_, CURLOPT_NOSIGNAL, 1L);
 	if(CURLE_OK!=res)
@@ -272,6 +296,14 @@ int32_t QNetworkAccessManager::doHttpGet(const char* pUrl, int32_t iTimeOut, cha
 	if(CURLE_OK!=res)
 		return NET_ERR_SET_WRITEDATA;
 
+	res=curl_easy_setopt(curl_handle_, CURLOPT_SSL_VERIFYPEER, 0L);
+	if(CURLE_OK!=res)
+		return NET_ERR_SSL_VERIFYPEER;
+
+	res=curl_easy_setopt(curl_handle_, CURLOPT_SSL_VERIFYHOST, 0L);
+	if(CURLE_OK!=res)
+		return NET_ERR_SSL_VERIFYHOST;
+
 	res=::curl_easy_setopt(curl_handle_, CURLOPT_NOSIGNAL, 1L);
 	if(CURLE_OK!=res)
 		return NET_ERR_SET_NOSIGNAL;
@@ -332,6 +364,14 @@ int32_t QNetworkAccessManager::doHttpDownload(const char* pUrl, const char* pFil
 	res=::curl_easy_setopt(curl_handle_, CURLOPT_WRITEDATA, (void*)fp);
 	if(CURLE_OK!=res)
 		return NET_ERR_SET_WRITEDATA;
+
+	res=curl_easy_setopt(curl_handle_, CURLOPT_SSL_VERIFYPEER, 0L);
+	if(CURLE_OK!=res)
+		return NET_ERR_SSL_VERIFYPEER;
+
+	res=curl_easy_setopt(curl_handle_, CURLOPT_SSL_VERIFYHOST, 0L);
+	if(CURLE_OK!=res)
+		return NET_ERR_SSL_VERIFYHOST;
 
 	res=::curl_easy_setopt(curl_handle_, CURLOPT_NOSIGNAL, 1L);
 	if(CURLE_OK!=res)

@@ -30,12 +30,14 @@ Q_BEGIN_NAMESPACE
 #define NET_ERR_SET_TIMEOUT_MS	(-8)
 #define NET_ERR_SET_WRITEFUNCTION (-9)
 #define NET_ERR_SET_WRITEDATA	(-10)
-#define NET_ERR_SET_NOSIGNAL	(-11)
-#define NET_ERR_SET_VERBOSE	(-12)
-#define NET_ERR_PERFORM		(-13)
-#define NET_ERR_FILE_OPEN	(-14)
-#define NET_ERR_TIMEOUT		(-15)
-#define NET_ERR_PAGE_TOO_LARGE	(-16)
+#define NET_ERR_SSL_VERIFYPEER	(-11)
+#define NET_ERR_SSL_VERIFYHOST	(-12)
+#define NET_ERR_SET_NOSIGNAL	(-13)
+#define NET_ERR_SET_VERBOSE	(-14)
+#define NET_ERR_PERFORM		(-15)
+#define NET_ERR_FILE_OPEN	(-16)
+#define NET_ERR_TIMEOUT		(-17)
+#define NET_ERR_PAGE_TOO_LARGE	(-18)
 
 #define NET_DEFAULT_REDIRECTIONS (-1L)
 #define NET_DEFAULT_TIMEOUT	(60*1000)
@@ -47,6 +49,12 @@ class QNetworkAccessManager {
 		QNetworkAccessManager();
 
 		virtual ~QNetworkAccessManager();
+
+		/* global init */
+		static int32_t global_init();
+
+		/* global cleanup */
+		static int32_t global_cleanup();
 
 		/* init */
 		int32_t init();
