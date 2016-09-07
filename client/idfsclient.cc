@@ -9,7 +9,7 @@ int main(int argc, char** argv)
 	networkReply reply;
 	int ret=0;
 
-	client.setHost("192.168.31.188", 8090);
+	client.setHost("192.168.1.91", 8090);
 	client.setTimeout(10000);
 
 	client.setProtocolType(1);
