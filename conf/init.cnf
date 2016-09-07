@@ -20,10 +20,10 @@ tcp-backlog = 511
 server-name = ImageDFS
 
 # Port for processing
-server-port = 8090
+server-port = 8190
 
 # Port for monitoring
-monitor-port = 8012
+monitor-port = 8112
 
 # Timeout for socket
 # Specify the socket timeouts until reporting an error.
@@ -36,9 +36,9 @@ comm-buffer-size = 1024
 
 comm-thread-timeout = 8000
 
-work-thread-max = 8
+work-thread-max = 18
 
-work-buffer-size = 1048576
+work-buffer-size = 1024
 
 work-thread-timeout = 12000
 
@@ -63,9 +63,9 @@ send-port = 22222
 
 # Image storage path
 # Path for storing images.
-img-path = /root/platformDC/img
+img-path = /data1/img
 
-img-dir = pic001
+img-dir = img005
 
 img-subdir-num = 1000
 
@@ -78,9 +78,9 @@ read-path = ./data/read.snd
 write-path = ./data/write.snd
 
 # MongoDB configuration
-mongo-uri = mongodb://127.0.0.1:27017
+mongo-uri = mongodb://192.168.1.91:27017
 
-mongo-img-collection = idfs.imginfo
+mongo-img-collection = IDDS.imgdb
 
 # Kalava log path
 # When the service starts, the startup log will be written under the log path. If
