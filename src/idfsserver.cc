@@ -53,6 +53,11 @@ int32_t IDFSServer::initialize()
 
 	mongo_client_->setCollection(mongo_img_collection_);
 
+	/* curl global */
+	ret=QNetworkAccessManager::global_init();
+	if(ret<0)
+		return TCP_ERR;
+
 	return TCP_OK;
 }
 
@@ -182,6 +187,7 @@ int32_t IDFSServer::server_main(uint16_t type, const char* ptr_data, int32_t dat
 	std::string local_path("");
 	std::string file_path("");
 	std::string img_size("");
+	std::string img_md5("");
 
 	int32_t width=0;
 	int32_t height=0;
@@ -206,16 +212,19 @@ int32_t IDFSServer::server_main(uint16_t type, const char* ptr_data, int32_t dat
 		iid=qmd5.MD5Bits64((unsigned char*)ptr_data, data_len);
 		imgid=q_to_string(iid);
 
+		img_md5=md5((char*)ptr_data, data_len);
+
 		mongo_mutex_.lock();
 		if(mongo_client_->exists("imgid", imgid.c_str()))
 		{
-			if(mongo_client_->select("imgid", imgid.c_str(), "imgpath", local_path, "imgsize", img_size)==MONGO_ERR) {
+			if(mongo_client_->select("imgid", imgid.c_str(), "imgpath", file_path, "imgsize", img_size)==MONGO_ERR) {
 				mongo_mutex_.unlock();
 				return -54;
 			}
 		} else {
 			file_path=q_format("%s/%03d/%lx.%s", img_dir_, static_cast<int32_t>(iid%1000), iid, get_image_type_name(type));
-			local_path=img_path_+'/'+file_path;
+
+			local_path=q_format("%s/%s", img_path_, file_path.c_str());
 
 			ret=save_image(local_path.c_str(), ptr_data, data_len);
 			if(ret<0) {
@@ -231,7 +240,7 @@ int32_t IDFSServer::server_main(uint16_t type, const char* ptr_data, int32_t dat
 
 			img_size=q_format("%d*%d", width, height);
 
-			if(mongo_client_->insert("imgid", imgid.c_str(), "imgpath", local_path.c_str(), "imgsize", img_size.c_str())==MONGO_ERR) {
+			if(mongo_client_->insert("imgid", imgid.c_str(), "imgpath", file_path.c_str(), "imgsize", img_size.c_str())==MONGO_ERR) {
 				mongo_mutex_.unlock();
 				return -57;
 			}
@@ -244,26 +253,142 @@ int32_t IDFSServer::server_main(uint16_t type, const char* ptr_data, int32_t dat
 			return -58;
 		ptr_temp+=ret;
 
-		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgpath><![CDATA[%s]]></imgpath>\n", file_path.c_str());
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgmd5><![CDATA[%s]]></imgmd5>\n", img_md5.c_str());
 		if(ptr_temp+ret>=ptr_end)
 			return -59;
 		ptr_temp+=ret;
 
-		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgsize><![CDATA[%s]]></imgsize>\n", img_size.c_str());
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgpath><![CDATA[%s]]></imgpath>\n", file_path.c_str());
 		if(ptr_temp+ret>=ptr_end)
 			return -60;
 		ptr_temp+=ret;
 
-		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "</base>\n");
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgsize><![CDATA[%s]]></imgsize>\n", img_size.c_str());
 		if(ptr_temp+ret>=ptr_end)
 			return -61;
 		ptr_temp+=ret;
 
-		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "</doc>");
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "</base>\n");
 		if(ptr_temp+ret>=ptr_end)
 			return -62;
 		ptr_temp+=ret;
-		/************************ FINISH *****************************/
+
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "</doc>");
+		if(ptr_temp+ret>=ptr_end)
+			return -63;
+		ptr_temp+=ret;
+	} else if(type==64) {
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+		if(ptr_temp+ret>=ptr_end)
+			return -51;
+		ptr_temp+=ret;
+
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<doc>\n");
+		if(ptr_temp+ret>=ptr_end)
+			return -52;
+		ptr_temp+=ret;
+
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<base>\n");
+		if(ptr_temp+ret>=ptr_end)
+			return -53;
+		ptr_temp+=ret;
+
+		std::string request_xml(ptr_data, data_len);
+		std::string referer=q_substr(std::string(ptr_data, data_len), "<referer><![CDATA[", "]]></referer>");
+		std::string user_agent=q_substr(std::string(ptr_data, data_len), "<user_agent><![CDATA[", "]]></user_agent>");
+		std::string src=q_substr(std::string(ptr_data, data_len), "<src><![CDATA[", "]]></src>");
+
+		QNetworkAccessManager networkProxy;
+		ret=networkProxy.init();
+		if(ret<0)
+			return -531;
+
+		networkProxy.setReferer(referer.c_str());
+		networkProxy.setUserAgent(user_agent.c_str());
+		networkProxy.setRedirectionEnabled();
+
+		char* ptr_img=q_new_array<char>(IDFS_IMG_MAX_SIZE);
+		assert(ptr_img!=NULL);
+
+		ret=networkProxy.doHttpGet(src.c_str(), 8000, ptr_img, IDFS_IMG_MAX_SIZE);
+		if(ret<0) {
+			q_delete_array<char>(ptr_img);
+			return ret;
+		}
+
+		iid=qmd5.MD5Bits64((unsigned char*)ptr_img, ret);
+		imgid=q_to_string(iid);
+
+		img_md5=md5((char*)ptr_img, ret);
+
+		mongo_mutex_.lock();
+		if(mongo_client_->exists("imgid", imgid.c_str()))
+		{
+			if(mongo_client_->select("imgid", imgid.c_str(), "imgpath", file_path, "imgsize", img_size)==MONGO_ERR) {
+				q_delete_array<char>(ptr_img);
+				mongo_mutex_.unlock();
+				return -54;
+			}
+		} else {
+			file_path=q_format("%s/%03d/%lx.%s", img_dir_, static_cast<int32_t>(iid%1000), iid, get_image_type_name(type));
+
+			local_path=q_format("%s/%s", img_path_, file_path.c_str());
+
+			ret=save_image(local_path.c_str(), ptr_img, ret);
+			if(ret<0) {
+				q_delete_array<char>(ptr_img);
+				mongo_mutex_.unlock();
+				return -55;
+			}
+
+			ret=getImageSize(local_path.c_str(), &width, &height);
+			if(ret<0) {
+				q_delete_array<char>(ptr_img);
+				mongo_mutex_.unlock();
+				return -56;
+			}
+
+			img_size=q_format("%d*%d", width, height);
+
+			if(mongo_client_->insert("imgid", imgid.c_str(), "imgpath", file_path.c_str(), "imgsize", img_size.c_str())==MONGO_ERR) {
+				q_delete_array<char>(ptr_img);
+				mongo_mutex_.unlock();
+				return -57;
+			}
+		}
+
+		q_delete_array<char>(ptr_img);
+		mongo_mutex_.unlock();
+
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgid><![CDATA[%lu]]></imgid>\n", iid);
+		if(ptr_temp+ret>=ptr_end)
+			return -58;
+		ptr_temp+=ret;
+
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgmd5><![CDATA[%s]]></imgmd5>\n", img_md5.c_str());
+		if(ptr_temp+ret>=ptr_end)
+			return -59;
+		ptr_temp+=ret;
+
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgpath><![CDATA[%s]]></imgpath>\n", file_path.c_str());
+		if(ptr_temp+ret>=ptr_end)
+			return -60;
+		ptr_temp+=ret;
+
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "<imgsize><![CDATA[%s]]></imgsize>\n", img_size.c_str());
+		if(ptr_temp+ret>=ptr_end)
+			return -61;
+		ptr_temp+=ret;
+
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "</base>\n");
+		if(ptr_temp+ret>=ptr_end)
+			return -62;
+		ptr_temp+=ret;
+
+		ret=snprintf(ptr_temp, ptr_end-ptr_temp, "</doc>");
+		if(ptr_temp+ret>=ptr_end)
+			return -63;
+		ptr_temp+=ret;
 	} else {
 		logger_->log(LEVEL_ERROR, __FILE__, __LINE__, __FUNCTION__, log_screen_, \
 				"Operate type error, operate_type = (%d)!", \
@@ -285,6 +410,7 @@ int32_t IDFSServer::release()
 	q_free(mongo_uri_);
 	q_free(mongo_img_collection_);
 	q_delete<QMongoClient>(mongo_client_);
+	QNetworkAccessManager::global_cleanup();
 	return TCP_OK;
 }
 

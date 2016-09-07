@@ -17,10 +17,15 @@
 #include <ctime>
 #include <fstream>
 
+#include "MD5.h"
+
 #include "qmongoclient.h"
 #include "qglobal.h"
+#include "qnetworkaccessmanager.h"
 #include "qopencv.h"
 #include "qtcpsocket.h"
+
+#define IDFS_IMG_MAX_SIZE (3<<20)
 
 Q_USING_NAMESPACE
 
