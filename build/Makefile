@@ -54,6 +54,7 @@ INCS            += -I/usr/local/include/mongo-client-install/include/
 LIBS		:= `pkg-config --libs --cflags opencv`
 LIBS            += -I/usr/local/include/mongo-client-install/include/
 LIBS            += /usr/local/include/mongo-client-install/lib/libmongoclient.a
+LIBS            += -lcurl
 LIBS            += -lpthread
 LIBS            += -lboost_system -lboost_thread -lboost_regex -lboost_date_time
 
@@ -73,9 +74,11 @@ SRCS		:= qdir.cc
 SRCS		+= qfile.cc
 SRCS		+= qlogger.cc
 SRCS		+= qmongoclient.cc
+SRCS		+= qnetworkaccessmanager.cc
 SRCS		+= qremotemonitor.cc
 SRCS		+= qtcpsocket.cc
 SRCS		+= qservice.cc
+SRCS		+= MD5.cc
 SRCS		+= idfsserver.cc
 SRCS		+= main.cc
 
